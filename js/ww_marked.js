@@ -286,16 +286,20 @@ var ww = ww || {};
         }
         ww._savedata._data = data
         for (var i in data) {
-            ww._savedata.pushItem(i)
+            ww._savedata.pushTime(i)
         }
 
+        console.log(data)
         for (var i in data) {
             if (!ww.canUseLSData(i)) {
                 ww._savedata.delItem(i)
             }
         }
-
-        ww.timeSave()
+        for (var i in ww._filesMd5) {
+            if (!ww.canUseLSData(i)) {
+                ww._savedata.delItem(i)
+            }
+        }
     }
 
 
@@ -307,10 +311,11 @@ var ww = ww || {};
         if (!url) {
             return 0
         }
-        var md5 = ww.getFileMd5(url)
-        if (md5) {
-            ww._savedata.pushItem(url, [md5, data])
 
+        if (!ww.canUseLSData()) {
+            var md5 = ww.getFileMd5(url)
+            ww._savedata.pushItem(url, [md5, data])
+            ww.timeSaveWait()
         }
 
 
@@ -321,17 +326,21 @@ var ww = ww || {};
     }
 
 
-    /**根据时间保存 */
+    /**保存 */
     ww.timeSave = function () {
         if (ww._savedata._must) {
             ww._savedata._must = 0
-            //console.log("savedate")
+            console.log("savedate")
             var v = ww.LSSaveData()
         }
-        setTimeout(ww.timeSave, 60000)
     }
-
-
+    /**延时保存 */
+    ww.timeSaveWait = function () {
+        if (ww._timeSaveVar !== undefined) {
+            clearTimeout(ww._timeSaveVar)
+        }
+        ww._timeSaveVar = setTimeout(ww.timeSave, 1000)
+    }
 
     /**设置保存数据 */
     ww.LSSaveData = function () {
@@ -352,6 +361,7 @@ var ww = ww || {};
 
 
     ww.addUrlHear = function (url) {
+        return url
         var url = url || ""
         if (url.indexOf("./") == 0) {
             return url
@@ -361,6 +371,7 @@ var ww = ww || {};
     }
 
     ww.delUrlHear = function (url) {
+        return url
         var url = url || ""
         if (url.indexOf("./") == 0) {
             url = url.slice(2)
@@ -394,7 +405,7 @@ var ww = ww || {};
         if (ww._data[url] || ww._tempData[url]) {
             if (typeof loaded == "function") {
 
-                //console.log("have", url) 
+                console.log("have", url)
                 loaded(ww._data[url] || ww._tempData[url])
             } else {
                 console.log(ww._data[url] || ww._tempData[url])
@@ -407,7 +418,7 @@ var ww = ww || {};
         if (!temp) {
             var save = this.getLSData(url)
             if (save) {
-                // console.log("have save", url)
+                console.log("have save", url)
                 if (typeof loaded == "function") {
                     loaded(save[1])
                 } else {
@@ -421,6 +432,7 @@ var ww = ww || {};
         xhr.open('GET', url);
         xhr.responseType = (typeof (type) == "string") ? type : "arraybuffer"
         xhr.onloadend = function () {
+            console.log("get", url)
             var response = xhr.response || ""
             if (temp) {
                 ww._tempData[url] = response
@@ -519,7 +531,7 @@ var ww = ww || {};
 
     /**搜索 */
     ww.search = function (keywords, data) {
-        //console.log(keywords, data)
+        console.log(keywords, data, this.nowPath())
         if (keywords) {
             if (data == this.nowPath()) {
                 ww.Highlighter.search(ww.markeddiv, keywords)
@@ -551,13 +563,16 @@ var ww = ww || {};
             return
         }*/
         /**没有词语时不进行 */
-        if (!keywords) {
+        if (!keywords && keywords !== 0) {
             return
         }
-        var keywords = keywords || ""
+
 
         var url = ww.delUrlHear(url)
-        ww._findText = "./find/" + url + "&" + keywords + ".md"
+
+        // //
+        //ww._findText = "./find/" + url + "&" + keywords + ".md"
+        ww._findText = "find/" + url + "&" + keywords + ".md"
 
         if (ww._tempData[ww._findText]) {
             ww.push(ww._findText)
@@ -597,7 +612,8 @@ var ww = ww || {};
                         files: [],
                         filesre: {},
                         datafiles: [],
-                        findall: list.length
+                        findall: list.length,
+                        keywords: keywords
                     }
                     ww._findObj[ww._findText] = obj
                     var showhear = "# 搜索\n"
@@ -609,7 +625,8 @@ var ww = ww || {};
                     ww.push(ww._findText)
                     for (var i = 0; i < list.length; i++) {
                         var n = list[i]
-                        ww.getfind("./" + n, find, keywords, obj)
+                        //ww.getfind("./" + n, find, keywords, obj)
+                        ww.getfind(n, find, keywords, obj)
                     }
                 }
                 return
@@ -770,12 +787,16 @@ var ww = ww || {};
 
     /**获取并寻找 */
     ww.getfind = function (n, find, keywords, obj) {
+
+        var tn = "findTemp/" + n + "&" + keywords
+
+
         ww.get(n, "text", function (re) {
-
-
-
-            var r = find(re || "")
-
+            var r = ww._tempData[tn]
+            if (r === undefined) {
+                r = find(re || "")
+                ww._tempData[tn] = r
+            }
             obj.files.push(n)
             obj.filesre[n] = !!r
 
@@ -792,6 +813,7 @@ var ww = ww || {};
                 var showlink = "\n### " +
                     "[" + t + "]" +
                     "(" + "./" + (n).replace(/ /g, "%20") + ")\n"
+                //"(" + (n).replace(/ /g, "%20") + ")\n"
                 var showpath = "> " + path + "  \n"
                 var showre = "\n```\n" + r + "\n```\n"
 
@@ -825,30 +847,20 @@ var ww = ww || {};
         var re = ww.parsewords(keywords)
         if (Array.isArray(re) && re.length) {
 
-            var words = []
-            for (var i = 0; i < re.length; i++) {
-                if (re[i]) {
-                    words.push(ww.RegexParser(re[i], 'i'))
-                }
-            }
 
             return function (text) {
                 if (text) {
-                    var r = -1
-                    for (var i = 0; i < words.length; i++) {
-                        var rex = words[i]
-                        //var rex = 
+                    var r = Infinity
+                    for (var i = 0; i < re.length; i++) {
+                        var set = re[i]
+                        if (!set || !set.rex) { continue }
+                        var rex = set.rex
                         var index = text.search(rex)
-
-                        if (index < 0) {
-                            return false
-                        } else {
-                            if (r == -1) {
-                                r = index
-                            }
+                        if (index >= 0) {
+                            r = r < index ? r : index
                         }
                     }
-                    if (r >= 0) {
+                    if (r != Infinity) {
 
                         var sl = text.slice(0, r).split("\n")
 
@@ -878,38 +890,7 @@ var ww = ww || {};
 
     /**解析词语 */
     ww.parsewords = function (keywords) {
-
-        var json = ""
-        try {
-            var json = JSON.parse(keywords)
-
-        } catch (error) {
-            var json = keywords
-        }
-        keywords = json || ""
-        if (keywords) {
-            if (!Array.isArray(keywords)) {
-                if (typeof (keywords) == "object") {
-                    var re = []
-                    for (var n in keywords) {
-                        re.push(n);
-                    }
-                    return re
-                } else {
-                    var keywords = ["" + keywords]
-                }
-            }
-            if (Array.isArray(keywords)) {
-                if (keywords.length) {
-                    var re = []
-                    for (var i = 0; i < keywords.length; i++) {
-                        re.push(keywords[i]);
-                    }
-                    return re;
-                }
-            }
-        }
-        return ""
+        return ww.Highlighter.parsewords(keywords)
     }
 
 
@@ -917,7 +898,8 @@ var ww = ww || {};
 
 
 
-    ww.get("./js/files.json", "text", function (data) {
+    // ww.get("./js/files.json", "text", function (data) {
+    ww.get("js/files.json", "text", function (data) {
         var json
         try {
             json = JSON.parse(data)
@@ -949,8 +931,9 @@ var ww = ww || {};
         var value = ww.stringtrim(value)
         console.log(value)
         ww.setPathInputValue(value)
-        if (value.indexOf("./find/") == 0) {
-            ww.baseUrl = "./find.md"
+        // if (value.indexOf("./find/") == 0) {
+        if (value.indexOf("find/") == 0) {
+            ww.baseUrl = "find.md"
         } else {
             ww.baseUrl = value
         }
@@ -958,8 +941,8 @@ var ww = ww || {};
 
         ww.get(value, "text",
             function (re) {
-                ww.showmarked(re) 
-                ww.findonopen() 
+                ww.showmarked(re)
+                ww.findonopen()
 
                 if (hash) {
                     //window.location.hash = "#" + hash
@@ -1031,15 +1014,16 @@ var ww = ww || {};
 
 
     ww.getPath = function (index) {
-        return ww._path[index] || "./README.md"
+        //return ww._path[index] || "./README.md"
+        return ww._path[index] || "README.md"
     }
 
     /**添加地址 */
     ww.push = function (value) {
 
         var path = ww.nowPath()
-        if (value == path) { 
-            if(ww.findonopen()){
+        if (value == path) {
+            if (ww.findonopen()) {
                 return
             }
             ww.setPathInputValue(value)
@@ -1062,11 +1046,11 @@ var ww = ww || {};
             this._mustFind = 0
             if (find[0] == path) {
                 ww.Highlighter.search(ww.markeddiv, find[1])
-                ww.Highlighter.searchResult()
-                return 1 
+                //ww.Highlighter.searchResult()
+                return 1
             }
         }
-        return 0 
+        return 0
     }
 
 
@@ -1134,7 +1118,8 @@ var ww = ww || {};
 
 
     ww.toHome = function () {
-        var p = "./README.md"
+        //var p = "./README.md"
+        var p = "README.md"
         var path = ww.getPathInputValue()
         ww.push(p)
         if (path == p) {
@@ -1145,7 +1130,8 @@ var ww = ww || {};
     }
 
     ww.openHome = function () {
-        var p = "./README.md"
+        //var p = "./README.md"
+        var p = "README.md"
         ww.open(p)
     }
 
@@ -1216,7 +1202,8 @@ var ww = ww || {};
         ww.css = document.createElement("link");
         ww.css.setAttribute("rel", "stylesheet");
         ww.css.setAttribute("type", "text/css");
-        ww.css.setAttribute("href", "./js/github.css");
+        //ww.css.setAttribute("href", "./js/github.css");
+        ww.css.setAttribute("href", "js/github.css");
         ww.appendChild(ww.css, document.body);
     }
 
@@ -1270,29 +1257,35 @@ var ww = ww || {};
         ww.pathInput.type = "text"
         ww.appendChild(ww.pathInput, ww.top1);
 
+        /*
+        //当焦点
         ww.pathInput.onfocus = function () {
             ww.colorSelect.style.visibility = "visible"
         }
+        //改变
         ww.pathInput.onchange = function () {
             ww.colorSelect.style.visibility = "visible"
         }
+        //失去焦点
+          ww.pathInput.onblur = function () {
+            setTimeout(function () {
+                // ww.colorSelect.style.visibility  = "hidden" 
+            }, 100)
+        }
+        */
     }
 
 
 
     ww.creatcolorSelect = function () {
-      
+
         ww.colorSelect.type = "color"
 
         ww.colorSelect.value = ""
         //ww.colorSelect.style = "left:auto; top: 0; width:auto; position:absolute; ; "
         ww.appendChild(ww.colorSelect, ww.top1);
 
-        ww.pathInput.onblur = function () {
-            setTimeout(function () {
-                // ww.colorSelect.style.visibility  = "hidden" 
-            }, 100)
-        }
+
         ww.colorSelect.onchange = function () {
             console.log(ww.colorSelect.value)
         }
@@ -1449,13 +1442,13 @@ var ww = ww || {};
     /*
     ww.markcssSelect = function () {
         ww.cssSelect = document.createElement("select");
-
+ 
         var list = ["Juridico.scss", "Pesto.scss", "Academia.css", "Academic.css", "Amelia.css", "Avenue.css", "Base16 3024.css", "Base16 Ashes.css", "Base16 Atelier Dune.css", "Base16 Atelier Forest.css", "Base16 Atelier Heath.css", "Base16 Atelier Lakeside.css", "Base16 Atelier Seaside.css", "Base16 Bespin.css", "Base16 Brewer.css", "Base16 Chalk.css", "Base16 Codeschool.css", "Base16 Default.css", "Base16 Eighties.css", "Base16 Embers.css", "Base16 Flat.css", "Base16 Google.css", "Base16 Grayscale.css", "Base16 Green Screen.css", "Base16 Isotope.css", "Base16 London Tube.css", "Base16 Marrakesh.css", "Base16 Mocha.css", "Base16 Monokai.css", "Base16 Ocean.css", "Base16 Paraiso.css", "Base16 Pop.css", "Base16 Railscasts.css", "Base16 Shapeshifter.css", "Base16 Solarized.css", "Base16 Tomorrow.css", "Base16 Twilight.css", "Blank Code Theme.css", "Custom.css", "Firates.css", "Fountain.css", "Gotham.css", "Grump.css", "Header.css", "Highlighter.css", "Image Reference Pane.css", "Juridico.css", "Kult.css", "Lopash.css", "Palatino Memo.css", "Pandoctor.css", "Pesto.css", "Simplex.css", "Swiss Mou.css", "Teleprompter.css", "Torpedo.css", "Ulysses Freestraction Light.css", "UpstandingCitizen.css", "Vostock.css", "Yeti.css", "amblin.css", "antique.css", "github.css", "ink.css", "manuscript.css", "modern.css", "swiss.css"]
         var o = document.createElement("option");
         o.text = "默认样式";
         o.value = "./js/github.css"
         try { ww.cssSelect.add(o); } catch (ex) { ww.cssSelect.add(o, null); }
-
+ 
         for (var i = 0; i < list.length; i++) {
             var name = list[i]
             var text = name.split(".")[0]
@@ -1465,20 +1458,20 @@ var ww = ww || {};
             o.value = value
             try { ww.cssSelect.add(o); } catch (ex) { ww.cssSelect.add(o, null); }
         }
-
+ 
         ww.cssSelect.onchange = function () {
-
+ 
             var index = ww.cssSelect.selectedIndex; // 选中索引
-
+ 
             var text = ww.cssSelect.options[index].text; // 选中文本
-
+ 
             var value = ww.cssSelect.options[index].value;
-
+ 
             ww.css.setAttribute("href", value)
         }
-
+ 
         //ww.top1.appendChild(ww.cssSelect);
-
+ 
     } 
     */
 
@@ -1503,16 +1496,16 @@ var ww = ww || {};
         if (!this._colors) {
             //默认颜色  
             this._colors = [
-                '#6894b5, #000000',
-                '#68bbb5,#000000',
-                '#7983ab,#000000',
+                '#6894b5,#000000,#68bbb5,#000000',
+                '#68bbb5,#000000,#7983ab,#000000',
+                '#7983ab,#000000,#dae9d1,#000000',
                 '#dae9d1,#000000',
                 '#eabcf4,#000000',
                 '#c8e5ef,#000000',
-                '#f3e3cb, #000000',
+                '#f3e3cb,#000000',
                 '#e7cfe0,#000000',
                 '#c5d1f1,#000000',
-                '#deeee4, #000000',
+                '#deeee4,#000000',
                 '#b55ed2,#000000',
                 '#dcb7a0,#333333',
                 '#ffff00,#000000',
@@ -1531,7 +1524,7 @@ var ww = ww || {};
     Highlighter.prototype.search = function (node, keywords, index) {
 
         if (this._oldword == keywords && this._oldnode == node) {
-            if (index == undefined) {
+            if (index === undefined) {
                 index = this._searchIndex + 1
             }
 
@@ -1588,13 +1581,15 @@ var ww = ww || {};
 
 
     Highlighter.prototype.searchStart = function () {
-        this._searchIndex = -1
-        ww.scrollTo(0, 0)
-
+        this.searchIndex(0)
     }
 
     /**寻找索引 */
     Highlighter.prototype.searchIndex = function (i) {
+        if (this._lastFind) {
+            this.changeforkNode(0)
+            this._lastFind = null
+        }
 
         i = i || 0
         if (i <= 0 || i >= this._results.length) {
@@ -1605,20 +1600,43 @@ var ww = ww || {};
         var result = this._results[i]
 
         if (result) {
+            this._lastFind = result
+
+            this.changeforkNode(1)
+
             var data = result[0]
-
-
             var node = result[1]
             var childNode = result[2]
             var forkNode = result[3]
+            var keyword = result[4]
 
 
             var h = (window.innerHeight || 0) * 0.1
-
             ww.scrollTo(0, node.offsetTop - h)
         }
 
     }
+
+
+    Highlighter.prototype.changeforkNode = function (type) {
+        if (this._lastFind) {
+            result = this._lastFind
+            var data = result[0]
+            var node = result[1]
+            var childNode = result[2]
+            var forkNode = result[3]
+            var keyword = result[4]
+            this.changeforkNodeColor(forkNode, childNode, keyword, type)
+        }
+    }
+
+    Highlighter.prototype.changeforkNodeColor = function (forkNode, childNode, keyword, type) {
+        var re = keyword.rex2
+        forkNode.innerHTML = childNode.data.replace(
+            re, this.span(keyword, type)
+        );
+    }
+
 
 
     /** 
@@ -1671,7 +1689,7 @@ var ww = ww || {};
                         re, this.span(keyword)
                     );
                     node.replaceChild(forkNode, childNode);
-                    this._results.push([childNode.data, node, childNode, forkNode, this._results.length])
+                    this._results.push([childNode.data, node, childNode, forkNode, keyword, this._results.length])
                 }
             } else if (childNode.nodeType == 1) {
                 //childNode is element  
@@ -1681,15 +1699,25 @@ var ww = ww || {};
     }
 
 
-    Highlighter.prototype.span = function (keyword) {
+    Highlighter.prototype.span = function (keyword, type) {
 
-        var span = '<span ' +
-            'style=' +
-            'background-color:' + keyword.bgColor +
-            ';color:' + keyword.foreColor +
-            ' mce_style=background-color:' + keyword.bgColor +
-            ';color:' + keyword.foreColor + '>' + '$1' +
-            '</span>'
+        if (type) {
+            var span = '<span ' +
+                'style=' +
+                'background-color:' + keyword.bgColor2 +
+                ';color:' + keyword.foreColor2 +
+                ' mce_style=background-color:' + keyword.bgColor2 +
+                ';color:' + keyword.foreColor2 + '>' + '$1' +
+                '</span>'
+        } else {
+            var span = '<span ' +
+                'style=' +
+                'background-color:' + keyword.bgColor +
+                ';color:' + keyword.foreColor +
+                ' mce_style=background-color:' + keyword.bgColor +
+                ';color:' + keyword.foreColor + '>' + '$1' +
+                '</span>'
+        }
         return span
     }
 
@@ -1711,7 +1739,7 @@ var ww = ww || {};
             var json = keywords
         }
         keywords = json
-        if (keywords) {
+        if (keywords !== "") {
             if (!Array.isArray(keywords)) {
                 if (typeof (keywords) == "object") {
                     var re = []
@@ -1724,17 +1752,16 @@ var ww = ww || {};
 
                             if (typeof color == "string") {
                                 var color = color.split(',');
-                            }
-                            if (color) {
-                                keyword.bgColor = color[0];
-                                keyword.foreColor = color[1];
-                            }
-                            if (!(keyword.bgColor && keyword.foreColor)) {
-                                var color = this._colors[i % this._colors.length].split(',');
-                                keyword.bgColor = color[0];
-                                keyword.foreColor = color[1];
+                            } else {
+                                var color = this._colors[i % this._colors.length].split(',')
                                 i++
                             }
+
+                            keyword.bgColor = color[0];
+                            keyword.foreColor = color[1];
+                            keyword.bgColor2 = color[2];
+                            keyword.foreColor2 = color[3];
+
                             keyword.rex = ww.RegexParser(keyword.word, 'i')
                             keyword.rex2 = ww.RegexParser('(' + keyword.word + ')', 'gi')
                             re.push(keyword);
@@ -1756,6 +1783,8 @@ var ww = ww || {};
                             keyword.word = keywords[i];
                             keyword.bgColor = color[0];
                             keyword.foreColor = color[1];
+                            keyword.bgColor2 = color[2];
+                            keyword.foreColor2 = color[3];
                             keyword.rex = ww.RegexParser(keyword.word, 'i')
                             keyword.rex2 = ww.RegexParser('(' + keyword.word + ')', 'gi')
                             re.push(keyword);
