@@ -220,15 +220,26 @@ var ww = ww || {};
     }
 
 
+    /**数据 */
     ww._data = {}
-    ww._tempData = {}
+    /**搜索数据 */
+    ww._findData = {}
 
+
+    /**寻找的临时数据 */
+    ww._findTempData = {}
+    ww._findTempDataUse = 1
 
     /**位置储存列表 */
     ww._path = []
     ww._pathIndex = -1
 
+    /**搜索内容保存 */
+    ww._keywordsList = {}
+    ww._keywordsIndex = 0
 
+
+    /**文件 */
     ww._files = {}
     ww._fileslist = []
     ww._filesMd5 = {}
@@ -402,16 +413,16 @@ var ww = ww || {};
     * @param {*} abort 
     */
     ww.get = function (url, type, loaded, temp) {
-        if (ww._data[url] || ww._tempData[url]) {
+        if (ww._data[url] || ww._findData[url]) {
             if (typeof loaded == "function") {
 
                 console.log("have", url)
-                loaded(ww._data[url] || ww._tempData[url])
+                loaded(ww._data[url] || ww._findData[url])
             } else {
-                console.log(ww._data[url] || ww._tempData[url])
+                console.log(ww._data[url] || ww._findData[url])
             }
             if (!temp) {
-                ww.LSPushData(url, ww._data[url] || ww._tempData[url])
+                ww.LSPushData(url, ww._data[url] || ww._findData[url])
             }
             return
         }
@@ -435,7 +446,11 @@ var ww = ww || {};
             console.log("get", url)
             var response = xhr.response || ""
             if (temp) {
-                ww._tempData[url] = response
+                if (temp == 2) {
+                    ww._data[url] = response
+                } else {
+                    ww._findData[url] = response
+                }
             } else {
                 ww._data[url] = response
             }
@@ -456,7 +471,7 @@ var ww = ww || {};
     /**获得文件大小 */
     ww.getFileBig = function (url) {
         var url = ww.delUrlHear(url)
-        if (ww._data[url] || ww._tempData[url]) {
+        if (ww._data[url] || ww._findData[url]) {
             return 0
         }
         var save = ww.canUseLSData(url)
@@ -489,7 +504,7 @@ var ww = ww || {};
 
 
     /**制作文件列表 */
-    ww.markFileList = function (list, files, obj, obj2, obj3) {
+    ww.markFileList = function (files, list, obj, obj2, obj3) {
         var files = files || ww._files
         var list = list || []
         var obj = obj || []
@@ -498,16 +513,19 @@ var ww = ww || {};
 
         var path = list.join("/")
         if (typeof files == "object") {
-            obj2.push(path)
             obj3[path] = 0
             for (var i in files) {
                 list.push(i)
-                ww.markFileList(list, files[i], obj, obj2, obj3)
+                obj2.push(list.join("/"))
+                list.pop()
+            }
+            for (var i in files) {
+                list.push(i)
+                ww.markFileList(files[i], list, obj, obj2, obj3)
                 list.pop()
             }
         } else if (files) {
             obj.push(path)
-            obj2.push(path)
             obj3[path] = files
         }
         return [obj, obj2, obj3]
@@ -515,24 +533,44 @@ var ww = ww || {};
 
 
     /**生成查找文件表 */
-    ww.markFileFindList = function (data) {
-        var files = this._fileslist
+    ww.markFileFindList = function (data, files, obj) {
+        var files = files || this._fileslist
         var list = []
-
-        for (var i = 0; i < files.length; i++) {
-            var name = files[i]
-            if (!data || name.indexOf(data) == 0) {
-                list.push(name)
+        if (Array.isArray(files)) {
+            for (var i = 0; i < files.length; i++) {
+                var name = files[i]
+                if (!data || name.indexOf(data) == 0) {
+                    list.push(name)
+                }
             }
+        } else if (typeof files == "object") {
+            for (var i in files) {
+                var name = i
+                if (!data || name.indexOf(data) == 0) {
+                    list.push(name)
+                }
+            }
+        }
+        if (obj) {
+            list.sort(function (a, b) {
+                return obj[b] - obj[a]
+            })
         }
         return list
     }
 
+    ww.markObjectList = function (obj) {
+        return Object.getOwnPropertyNames(obj)
+    }
 
     /**搜索 */
     ww.search = function (keywords, data) {
-        console.log(keywords, data, this.nowPath())
         if (keywords) {
+
+            ww._keywordsList[keywords] = ww._keywordsIndex++
+
+
+
             if (data == this.nowPath()) {
                 ww.Highlighter.search(ww.markeddiv, keywords)
                 ww.Highlighter.searchResult()
@@ -574,7 +612,7 @@ var ww = ww || {};
         //ww._findText = "./find/" + url + "&" + keywords + ".md"
         ww._findText = "find/" + url + "&" + keywords + ".md"
 
-        if (ww._tempData[ww._findText]) {
+        if (ww._findData[ww._findText]) {
             ww.push(ww._findText)
             ww.search(keywords, ww._findText)
             return
@@ -596,7 +634,7 @@ var ww = ww || {};
                 return
             }
 
-            if (ww._tempData[ww._findText]) {
+            if (ww._findData[ww._findText]) {
                 ww.push(ww._findText)
                 ww.search(keywords, ww._findText)
                 return
@@ -616,12 +654,10 @@ var ww = ww || {};
                         keywords: keywords
                     }
                     ww._findObj[ww._findText] = obj
-                    var showhear = "# 搜索\n"
-                    var showpath = "\n>搜索位置:" + url + "  "
-                    var showtext = "\n>搜索内容:" + keywords + "  \n"
-                    obj.hear = showhear + showpath + showtext
 
-                    ww._tempData[ww._findText] = obj.hear + "\n>搜索中: 需要搜索" + list.length + "个文件  \n"
+                    obj.hear = ww.markfindHear(url, keywords)
+                    ww._findData[ww._findText] = obj.hear + "\n# 搜索中\n" +
+                        "\n>需要搜索" + list.length + "个文件\n"
                     ww.push(ww._findText)
                     for (var i = 0; i < list.length; i++) {
                         var n = list[i]
@@ -634,18 +670,10 @@ var ww = ww || {};
         }
 
         /**当没有搜索内容时 */
-        var showhear = "# 搜索\n"
-        var showpath = "\n>搜索位置:" + url + "  "
-        var showtext = "\n>搜索内容:" + keywords + "  \n"
 
-        var showend = "\n# 搜索结束"
-        var showall = "\n\n>搜索 " + 0 + " 个文件  "
-        var shownum = "\n>找到 " + 0 + " 个文件\n"
 
-        ww._tempData[ww._findText] =
-            showhear + showpath + showtext +
-            "" +
-            showend + showall + shownum
+        ww._findData[ww._findText] = ww.markfindData(ww.markfindHear(url, keywords), 0, 0)
+
 
         ww._findIndex = 0
         ww._findNumber = 0
@@ -788,15 +816,21 @@ var ww = ww || {};
     /**获取并寻找 */
     ww.getfind = function (n, find, keywords, obj) {
 
-        var tn = "findTemp/" + n + "&" + keywords
 
 
+        var tn = n + "&" + keywords
         ww.get(n, "text", function (re) {
-            var r = ww._tempData[tn]
+
+            /*if (!ww._findTempDataUse) {
+                var r = find(re || "") 
+            } else {*/
+            var r = ww._findTempData[tn]
             if (r === undefined) {
                 r = find(re || "")
-                ww._tempData[tn] = r
+                ww._findTempData[tn] = r
             }
+            //}
+
             obj.files.push(n)
             obj.filesre[n] = !!r
 
@@ -824,13 +858,7 @@ var ww = ww || {};
 
             if (obj.files.length >= obj.findall) {
 
-                var showend = "\n# 搜索结束"
-                var showall = "\n\n>搜索 " + obj.findall + " 个文件  "
-                var shownum = "\n>找到 " + obj.datafiles.length + " 个文件\n"
-
-                obj.end = showend + showall + shownum
-
-                ww._tempData[obj.findText] = obj.hear + obj.data.join("") + obj.end
+                ww._findData[obj.findText] = ww.markfindData(obj.hear, obj.findall, obj.data)
                 if (ww.nowPath() == obj.findText) {
                     ww.open(obj.findText)
                     ww.search(keywords, obj.findText)
@@ -841,6 +869,33 @@ var ww = ww || {};
     }
 
 
+    ww.markfindHear = function (url, keywords) {
+
+        var showhear = "# 搜索\n"
+        var showpath = "\n>搜索位置:" + url + "  "
+        var showtext = "\n>搜索内容:" + keywords + "  \n"
+
+        var t = showhear + showpath + showtext
+        return t
+
+    }
+
+    ww.markfindData = function (hear, all, data) {
+
+
+        var showdata = "" //"\n---\n"
+        var showend = "\n# 搜索结束"
+        var showall = "\n\n>搜索 " + all + " 个文件  "
+        var shownum = "\n>找到 " + (data ? data.length : 0) + " 个文件\n"
+        var hear = hear
+        var s = Array.isArray(data) ? (showall + shownum + showdata) : showdata
+        var c = Array.isArray(data) ? data.join("") : ""
+        var end = showdata + showend + showall + shownum
+
+        var t = hear + s + c + end
+        return t
+
+    }
 
     /**生成寻找方法 */
     ww.markfind = function (keywords) {
@@ -858,6 +913,9 @@ var ww = ww || {};
                         var index = text.search(rex)
                         if (index >= 0) {
                             r = r < index ? r : index
+                        } else {
+                            r = Infinity
+                            break
                         }
                     }
                     if (r != Infinity) {
@@ -919,7 +977,7 @@ var ww = ww || {};
         ww.openHome()
 
 
-    }, 1)
+    }, 2)
 
 })();
 
@@ -1276,24 +1334,250 @@ var ww = ww || {};
     }
 
 
-
-    ww.creatcolorSelect = function () {
-
-        ww.colorSelect.type = "color"
-
-        ww.colorSelect.value = ""
-        //ww.colorSelect.style = "left:auto; top: 0; width:auto; position:absolute; ; "
-        ww.appendChild(ww.colorSelect, ww.top1);
+    //ww.pathSelectClose = false
 
 
-        ww.colorSelect.onchange = function () {
-            console.log(ww.colorSelect.value)
+    ww.pathSelectClose = function () {
+        if (ww.pathSelect._close) {
+            ww.pathSelect._close = false
+            ww.pathSelect.style.visibility = "hidden"
+        }
+    }
+
+    ww.pathSelectOpen = function () {
+
+        var pI = ww.pathInput
+        var pS = ww.pathSelect
+
+        var value = pI.value
+
+
+        var nl = value.length
+
+        if (ww._lastPathSelect == value && ww._lastPathSelectList) {
+            var list = ww._lastPathSelectList
+        } else {
+            var l1 = ww.markFileFindList(value, ww._dirFileslist)
+            var l2 = ww.markFileFindList(value, ww._findData)
+
+            var list = l1.concat(l2)
+            if (list.indexOf(value) != 0) {
+                list.unshift(value)
+            }
+
+            pS.options.length = Math.min(list.length, pS.options.length)
+
+            for (var i = pS.options.length; i < list.length; i++) {
+                var o = document.createElement("option");
+                o.text = "";
+                o.value = ""
+                try { pS.add(o); } catch (ex) { pS.add(o, null); }
+            }
+            for (var i = 0; i < list.length; i++) {
+                var n = list[i]
+                var o = pS.options[i]
+                if (o) {
+                    o.value = n
+                    o.text = n.slice(nl)
+                }
+            }
+            pS.selectedIndex = 0;
+            ww._lastPathSelectList = list
+            ww._lastPathSelect = value
+
+        }
+
+        pS.size = list.length <2?2:  list.length
+        pS._close = false
+        pS.style.visibility = "visible"
+        pS.style.top = pI.offsetTop + pI.offsetHeight + "px"
+        pS.style.left = pI.offsetLeft + "px"
+        pS.style.width = pI.offsetWidth + "px"
+        pS.style.height = Math.min(
+            window.innerHeight * 0.5,
+            pI.offsetHeight *  Math.min(list.length, 5) 
+        ) + "px"
+
+    }
+
+    ww.creatpathSelect = function () {
+        ww.pathSelect = document.createElement("select")
+
+        ww.pathSelect.style.position = "absolute"
+        ww.pathSelect.size = 5
+        ww.pathSelect.style.visibility = "hidden"
+        //ww.pathSelect.style = "left:auto; top: 0; width:auto; position:absolute; ; "
+        ww.appendChild(ww.pathSelect, ww.top1);
+
+        ww.pathInput.onfocus = function () {
+            ww.pathSelectOpen()
+        }
+        ww.pathInput.onpropertychange = function () {
+            ww.pathSelectOpen()
+        }
+
+        ww.pathInput.oninput = function () {
+            ww.pathSelectOpen()
+        }
+        //改变
+        ww.pathInput.onchange = function () {
+            ww.pathSelectOpen()
+        }
+
+
+
+
+        //失去焦点
+        ww.pathInput.onblur = function () {
+            ww.pathSelect._close = true
+            setTimeout(ww.pathSelectClose, 10)
+        }
+
+
+        //失去焦点
+        ww.pathSelect.onblur = function () {
+            ww.pathSelect._close = true
+            setTimeout(ww.pathSelectClose, 10)
+        }
+
+        //获得焦点 
+        ww.pathSelect.onfocus = function () {
+            ww.pathSelect._close = false
+        }
+
+        /* ww.pathSelect.onchange = function () {
+            
+ 
+         } */
+
+        ww.pathSelect.onclick = function () {
+            ww.pathInput.value = ww.pathSelect.value
+            ww.pathSelect.style.visibility = "hidden"
+            console.log("click", ww.pathSelect.selectedIndex)
         }
     }
 
 
 
 
+    ww.findSelectClose = function () {
+        if (ww.findSelect._close) {
+            ww.findSelect._close = false
+            ww.findSelect.style.visibility = "hidden"
+        }
+    }
+
+
+
+
+    ww.findSelectOpen = function () {
+        var pI = ww.findInput
+        var pS = ww.findSelect
+
+        var value = pI.value
+
+
+        var nl = value.length
+
+        if (ww._lastfindSelect == value && ww._lastfindSelectList) {
+            var list = ww._lastfindSelectList
+        } else {
+            var list = ww.markFileFindList(value, ww._keywordsList, ww._keywordsList)
+            if (list.indexOf(value) != 0) {
+                list.unshift(value)
+            }
+
+            pS.options.length = Math.min(list.length, pS.options.length)
+
+            for (var i = pS.options.length; i < list.length; i++) {
+                var o = document.createElement("option");
+                o.text = "";
+                o.value = ""
+                try { pS.add(o); } catch (ex) { pS.add(o, null); }
+            }
+            for (var i = 0; i < list.length; i++) {
+                var n = list[i]
+                var o = pS.options[i]
+                if (o) {
+                    o.value = n
+                    o.text = n //.slice(nl)
+                }
+            }
+            pS.selectedIndex = 0;
+            ww._lastfindSelectList = list
+            ww._lastfindSelect = value
+
+        }
+
+        pS.size = list.length <2?2:  list.length 
+        pS._close = false
+        pS.style.visibility = "visible"
+        pS.style.top = pI.offsetTop + pI.offsetHeight + "px"
+        pS.style.left = pI.offsetLeft + "px"
+        pS.style.width = pI.offsetWidth + "px"
+        pS.style.height = Math.min(
+            window.innerHeight * 0.5,
+            pI.offsetHeight * Math.max(2, Math.min(list.length, 5))
+        ) + "px"
+
+    }
+
+    ww.creatfindSelect = function () {
+        ww.findSelect = document.createElement("select")
+
+        ww.findSelect.style.position = "absolute"
+        ww.findSelect.size = 5
+        ww.findSelect.style.visibility = "hidden"
+        //ww.findSelect.style = "left:auto; top: 0; width:auto; position:absolute; ; "
+        ww.appendChild(ww.findSelect, ww.top2);
+
+        ww.findInput.onfocus = function () {
+            ww.findSelectOpen()
+        }
+        ww.findInput.onpropertychange = function () {
+            ww.findSelectOpen()
+        }
+
+        ww.findInput.oninput = function () {
+            ww.findSelectOpen()
+        }
+        //改变
+        ww.findInput.onchange = function () {
+            ww.findSelectOpen()
+        }
+
+
+
+
+        //失去焦点
+        ww.findInput.onblur = function () {
+            ww.findSelect._close = true
+            setTimeout(ww.findSelectClose, 10)
+        }
+
+
+        //失去焦点
+        ww.findSelect.onblur = function () {
+            ww.findSelect._close = true
+            setTimeout(ww.findSelectClose, 10)
+        }
+
+        //获得焦点 
+        ww.findSelect.onfocus = function () {
+            ww.findSelect._close = false
+        }
+
+        /* ww.findSelect.onchange = function () {
+            
+ 
+         } */
+
+        ww.findSelect.onclick = function () {
+            ww.findInput.value = ww.findSelect.value
+            ww.findSelect.style.visibility = "hidden"
+            console.log("click", ww.findSelect.selectedIndex)
+        }
+    }
 
 
 
@@ -1313,7 +1597,6 @@ var ww = ww || {};
 
 
     /**主页 */
-
     ww.creathomeButton = function () {
         ww.homeButton = document.createElement("input")
         ww.homeButton.type = "button"
@@ -1423,6 +1706,11 @@ var ww = ww || {};
         ww.creatopenButton()
 
 
+        /**位置选择器 */
+        ww.creatpathSelect()
+        /**搜索选择器 */
+
+        ww.creatfindSelect()
         /**css选择器 */
         //ww.markcssSelect()
 
@@ -1496,19 +1784,19 @@ var ww = ww || {};
         if (!this._colors) {
             //默认颜色  
             this._colors = [
-                '#6894b5,#000000,#68bbb5,#000000',
-                '#68bbb5,#000000,#7983ab,#000000',
-                '#7983ab,#000000,#dae9d1,#000000',
-                '#dae9d1,#000000',
-                '#eabcf4,#000000',
-                '#c8e5ef,#000000',
-                '#f3e3cb,#000000',
-                '#e7cfe0,#000000',
-                '#c5d1f1,#000000',
-                '#deeee4,#000000',
-                '#b55ed2,#000000',
-                '#dcb7a0,#333333',
-                '#ffff00,#000000',
+                '#6894b5,#000000,#ffff00,#000000',
+                '#68bbb5,#000000,#ffff00,#000000',
+                '#7983ab,#000000,#ffff00,#000000',
+                '#dae9d1,#000000,#ffff00,#000000',
+                '#eabcf4,#000000,#ffff00,#000000',
+                '#c8e5ef,#000000,#ffff00,#000000',
+                '#f3e3cb,#000000,#ffff00,#000000',
+                '#e7cfe0,#000000,#ffff00,#000000',
+                '#c5d1f1,#000000,#ffff00,#000000',
+                '#deeee4,#000000,#ffff00,#000000',
+                '#b55ed2,#000000,#ffff00,#000000',
+                '#dcb7a0,#333333,#ffff00,#000000',
+                '#ffff00,#000000,#ffff00,#000000',
             ];
         }
     }
@@ -1626,17 +1914,34 @@ var ww = ww || {};
             var childNode = result[2]
             var forkNode = result[3]
             var keyword = result[4]
-            this.changeforkNodeColor(forkNode, childNode, keyword, type)
+            var keywords = this.keywords
+
+            var length = keywords ? keywords.length : 0;
+            this.changeforkNodeColor(forkNode, childNode, keywords, length, type)
+
         }
     }
 
-    Highlighter.prototype.changeforkNodeColor = function (forkNode, childNode, keyword, type) {
-        var re = keyword.rex2
-        forkNode.innerHTML = childNode.data.replace(
-            re, this.span(keyword, type)
-        );
-    }
+    /**改变节点颜色 */
+    Highlighter.prototype.changeforkNodeColor = function (forkNode, childNode, keywords, length, type) {
+        //childNode is #text     
+        //forkNode.innerHTML = childNode.innerHTML
+        for (var ki = length - 1; ki >= 0; ki--) {
+            var keyword = keywords[ki]
+            var re = keyword.rex
+            if (childNode.data.search(re) == -1) {
+                continue
+            } else {
+                var re = keyword.rex2
+                forkNode.innerHTML = childNode.data.replace(
+                    re, this.span(keyword, type)
+                );
+                this.colorword(forkNode, keywords, ki, 0, type)
+                break
+            }
+        }
 
+    }
 
 
     /** 
@@ -1656,15 +1961,16 @@ var ww = ww || {};
             keywords = this.parsewords(keywords);
         }
         this.dehighlight()
+
+        this.keywords = keywords
         if (!keywords) {
             return this._results
         };
 
-        for (var ki = 0; ki < keywords.length; ki++) {
-            var keyword = keywords[ki]
-            this.colorword(node, keyword);
-        }
+        var length = keywords ? keywords.length : 0;
+        this.colorword(node, keywords, length, 1);
 
+        console.log(this._results)
         return this._results
     }
 
@@ -1673,27 +1979,37 @@ var ww = ww || {};
      * @param {} node 节点 
      * @param {} keyword 关键字结构体，包含了关键字、前景色、背景色 
      */
-    Highlighter.prototype.colorword = function (node, keyword) {
+    Highlighter.prototype.colorword = function (node, keywords, leng, push, type) {
         for (var i = 0; i < node.childNodes.length; i++) {
             var childNode = node.childNodes[i];
 
             if (childNode.nodeType == 3) {
-                //childNode is #text   
-                var re = keyword.rex
-                if (childNode.data.search(re) == -1) {
-                    continue
-                } else {
-                    var forkNode = document.createElement('span');
-                    var re = keyword.rex2
-                    forkNode.innerHTML = childNode.data.replace(
-                        re, this.span(keyword)
-                    );
-                    node.replaceChild(forkNode, childNode);
-                    this._results.push([childNode.data, node, childNode, forkNode, keyword, this._results.length])
+                //childNode is #text    
+                for (var ki = leng - 1; ki >= 0; ki--) {
+                    var keyword = keywords[ki]
+                    var re = keyword.rex
+                    if (childNode.data.search(re) == -1) {
+                        continue
+                    } else {
+
+                        var forkNode = document.createElement('span');
+                        var re = keyword.rex2
+                        forkNode.innerHTML = childNode.data.replace(
+                            re, this.span(keyword, type)
+                        );
+
+                        node.replaceChild(forkNode, childNode);
+
+                        if (push) {
+                            this._results.push([childNode.data, node, childNode, forkNode, this._results.length])
+                        }
+                        this.colorword(forkNode, keywords, ki, 0, type)
+                        break
+                    }
                 }
             } else if (childNode.nodeType == 1) {
                 //childNode is element  
-                this.colorword(childNode, keyword);
+                this.colorword(childNode, keywords, leng, push, type);
             }
         }
     }
