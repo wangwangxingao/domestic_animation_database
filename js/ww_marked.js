@@ -220,8 +220,8 @@ var ww = ww || {};
     }
 
 
-    saveHash.prototype.markFileFindList = function(){
-        ww.markFileFindList("",this._data,this._time)
+    saveHash.prototype.markFileFindList = function () {
+        ww.markFileFindList("", this._data, this._time)
     }
 
 
@@ -577,15 +577,14 @@ var ww = ww || {};
 
 
             if (data == this.nowPath()) {
-                ww.Highlighter.search(ww.markeddiv, keywords)
-                ww.Highlighter.searchResult()
+                ww.findMarked(keywords)
             } else {
                 if (ww.getFileMd5(data)) {
                     ww._mustFind = [data, keywords]
                     ww.push(data)
 
                 } else {
-                    ww.find(keywords, data)
+                    ww.findFile(keywords, data)
                 }
             }
         } else {
@@ -596,10 +595,27 @@ var ww = ww || {};
 
     ww._findObj = {}
 
+    ww.findMarked = function (keywords, node) {
+        var node = node || ww.markeddiv
 
+        ww.highlighter.search(node, keywords)
+
+        var index = ww.highlighter.index()
+        var result = ww.highlighter.result()
+
+        var all = result.length
+
+        ww.findPosOpen(index, all)
+        ww.findButton.value = all<10? "  " +all :all<100?" "+all:all
+      
+
+
+        //ww.highlighter.searchResult()
+
+    }
 
     /**寻找 */
-    ww.find = function (keywords, url) {
+    ww.findFile = function (keywords, url) {
 
         /**搜索中 不继续 */
         /*if (ww._findIndex > 0) {
@@ -955,7 +971,7 @@ var ww = ww || {};
 
     /**解析词语 */
     ww.parsewords = function (keywords) {
-        return ww.Highlighter.parsewords(keywords)
+        return ww.highlighter.parsewords(keywords)
     }
 
 
@@ -1059,8 +1075,10 @@ var ww = ww || {};
 
     /**清除搜索结果 */
     ww.clearFind = function () {
-        ww.Highlighter.clear()
-        //ww.findButton.value = "搜索"
+        ww.highlighter.clear()
+
+        ww.findButton.value = "搜索"
+        ww.findPosClose()
         //ww.findButton.value = "搜索"
     }
 
@@ -1111,8 +1129,8 @@ var ww = ww || {};
             var find = this._mustFind
             this._mustFind = 0
             if (find[0] == path) {
-                ww.Highlighter.search(ww.markeddiv, find[1])
-                //ww.Highlighter.searchResult()
+                ww.findMarked(find[1])
+
                 return 1
             }
         }
@@ -1450,8 +1468,8 @@ var ww = ww || {};
 
         //pS.size = 1 //list.length <2?2:  list.length
         pS._close = false
-        pS.style.visibility =list.length==1? "hidden": "visible"
-      
+        pS.style.visibility = list.length == 1 ? "hidden" : "visible"
+
         pS.style.top = pI.offsetTop + pI.offsetHeight + "px"
         pS.style.left = pI.offsetLeft + "px"
         pS.style.width = pI.offsetWidth + "px"
@@ -1459,6 +1477,89 @@ var ww = ww || {};
             window.innerHeight * 0.5,
             pI.offsetHeight *  Math.min(list.length, 5) 
         ) + "px"*/
+
+    }
+
+
+
+    /**上一个 */
+    ww.creatlastButton = function () {
+        ww.lastButton = document.createElement("input")
+        ww.lastButton.type = "button"
+        ww.lastButton.value = "<"
+        ww.lastButton.onclick = function () {
+            ww.toLast()
+        }
+        ww.appendChild(ww.lastButton, ww.top1);
+    }
+
+
+
+
+    /**主页 */
+    ww.creathomeButton = function () {
+        ww.homeButton = document.createElement("input")
+        ww.homeButton.type = "button"
+        ww.homeButton.value = "合"
+        ww.homeButton.onclick = function () {
+            ww.toHome()
+        }
+        ww.appendChild(ww.homeButton, ww.top1);
+
+    }
+
+
+
+    /**下一个 */
+    ww.creatnextButton = function () {
+        ww.nextButton = document.createElement("input")
+        ww.nextButton.type = "button"
+        ww.nextButton.value = ">"
+        ww.nextButton.onclick = function () {
+            ww.toNext()
+        }
+        ww.appendChild(ww.nextButton, ww.top1);
+    }
+
+
+
+
+
+    /**设置打开按键 */
+    ww.creatsetButton = function () {
+        ww.setButton = document.createElement("input")
+        ww.setButton.type = "button"
+        ww.setButton.value = "*"
+        ww.setButton.onclick = function () {
+            ww.setOpen()
+        }
+        ww.appendChild(ww.setButton, ww.top1);
+    }
+
+
+
+
+
+
+
+    /**寻找输入 */
+    ww.creatfindInput = function () {
+        ww.findInput = document.createElement("input")
+        ww.findInput.type = "text"
+        ww.findInput.value = ""
+        ww.appendChild(ww.findInput, ww.top2);
+    }
+
+    /**寻找按钮 */
+
+    ww.creatfindButton = function () {
+        ww.findButton = document.createElement("input")
+        ww.findButton.type = "button"
+        ww.findButton.value = "搜索"
+        ww.findButton.onclick = function () {
+            ww.search(ww.findInput.value, ww.getPathInputValue())
+        }
+        ww.appendChild(ww.findButton, ww.top2);
 
     }
 
@@ -1536,6 +1637,21 @@ var ww = ww || {};
         if (ww.findSelect._close) {
             ww.findSelect._close = false
             ww.findSelect.style.visibility = "hidden"
+
+            var pI = ww.findInput
+            var value = pI.value
+            if (value && value == ww.highlighter.keywords()) {
+                var index = ww.highlighter.index()
+                var result = ww.highlighter.result()
+                var all = result.length
+                ww.findButton.value = all<10? "  " +all :all<100?" "+all:all
+             
+                ww.findPosOpen(index,all)
+            } else {
+                ww.findPosClose()
+                ww.findButton.value = "搜索"
+            }
+
         }
     }
 
@@ -1547,6 +1663,18 @@ var ww = ww || {};
         var pS = ww.findSelect
 
         var value = pI.value
+
+
+        if (value && value == ww.highlighter.keywords()) {
+            var index = ww.highlighter.index()
+            var result = ww.highlighter.result()
+            var all = result.length
+            ww.findButton.value = all<10? "  " +all :all<100?" "+all:all
+            ww.findPosClose()
+        } else {
+            ww.findPosClose()
+            ww.findButton.value = "搜索"
+        }
 
 
         var nl = value.length
@@ -1583,7 +1711,7 @@ var ww = ww || {};
 
         //pS.size = 1 //list.length <2?2:  list.length 
         pS._close = false
-        pS.style.visibility =list.length==1? "hidden": "visible"
+        pS.style.visibility = list.length == 1 ? "hidden" : "visible"
         pS.style.top = pI.offsetTop + pI.offsetHeight + "px"
         pS.style.left = pI.offsetLeft + "px"
         pS.style.width = pI.offsetWidth + "px"
@@ -1595,87 +1723,84 @@ var ww = ww || {};
     }
 
 
-    /**上一个 */
-    ww.creatlastButton = function () {
-        ww.lastButton = document.createElement("input")
-        ww.lastButton.type = "button"
-        ww.lastButton.value = "<"
-        ww.lastButton.onclick = function () {
-            ww.toLast()
+
+    ww.creatfindPos = function () {
+        ww.findPos = document.createElement("input")
+        ww.findPos.type = "number"
+        ww.findPos.min = 0
+        ww.findPos.max = 0
+        ww.findPos.step = 1
+
+        ww.findPos.style.position = "absolute"
+        ww.findPos.style.visibility = "hidden"
+        ww.appendChild(ww.findPos, ww.top2);
+
+
+        ww.findPos2 = document.createElement("input")
+        ww.findPos2.type = "range"
+        ww.findPos2.min = 0
+        ww.findPos2.max = 0
+        ww.findPos2.step = 1
+
+
+        ww.findPos2.style.position = "absolute"
+        ww.findPos2.style.visibility = "hidden"
+        ww.appendChild(ww.findPos2, ww.top2);
+
+        ww.findPos.onchange = function () {
+            ww.findPosTo(ww.findPos.value)
         }
-        ww.appendChild(ww.lastButton, ww.top1);
-    }
 
-
-
-
-    /**主页 */
-    ww.creathomeButton = function () {
-        ww.homeButton = document.createElement("input")
-        ww.homeButton.type = "button"
-        ww.homeButton.value = "合"
-        ww.homeButton.onclick = function () {
-            ww.toHome()
+        ww.findPos2.onchange = function () {
+            ww.findPosTo(ww.findPos2.value)
         }
-        ww.appendChild(ww.homeButton, ww.top1);
-
     }
 
+    ww.findPosTo = function (value) {
+        var value = value * 1
+        ww.findPos.value = value
+        ww.findPos2.value = value
+        ww.highlighter.searchIndex(value)
+    }
 
-
-    /**下一个 */
-    ww.creatnextButton = function () {
-        ww.nextButton = document.createElement("input")
-        ww.nextButton.type = "button"
-        ww.nextButton.value = ">"
-        ww.nextButton.onclick = function () {
-            ww.toNext()
+    ww.findPosOpen = function (value, all) {
+        if (!all) {
+            ww.findPosClose()
+            return
         }
-        ww.appendChild(ww.nextButton, ww.top1);
+        var pI = ww.findInput
+
+
+        var width = pI.offsetWidth * 0.5
+        var top = pI.offsetTop + pI.offsetHeight
+
+        var pS = ww.findPos
+        pS.style.top = pI.offsetTop + "px"
+        pS.style.left = pI.offsetLeft + width + "px"
+        pS.style.width = width + "px"
+        pS.style.visibility = "visible"
+
+        pS.value = value
+        pS.max = all
+
+        var pS = ww.findPos2
+        pS.style.top = pI.offsetTop + pI.offsetHeight + "px"
+        pS.style.left = pI.offsetLeft + "px"
+        pS.style.width = pI.offsetWidth + "px"
+        pS.style.visibility = "visible"
+        pS.value = value
+        pS.max = all
+
+
     }
 
 
-
-
-
-    /**设置打开按键 */
-    ww.creatsetButton = function () {
-        ww.setButton = document.createElement("input")
-        ww.setButton.type = "button"
-        ww.setButton.value = "*"
-        ww.setButton.onclick = function () {
-            ww.setOpen()
-        }
-        ww.appendChild(ww.setButton, ww.top1);
+    ww.findPosClose = function () {
+        var pS = ww.findPos
+        pS.style.visibility = "hidden"
+        var pS = ww.findPos2
+        pS.style.visibility = "hidden"
     }
-
-
-
-
-
-
-
-    /**寻找输入 */
-    ww.creatfindInput = function () {
-        ww.findInput = document.createElement("input")
-        ww.findInput.type = "text"
-        ww.findInput.value = ""
-        ww.appendChild(ww.findInput, ww.top2);
-    }
-
-    /**寻找按钮 */
-
-    ww.creatfindButton = function () {
-        ww.findButton = document.createElement("input")
-        ww.findButton.type = "button"
-        ww.findButton.value = "搜索"
-        ww.findButton.onclick = function () { 
-            ww.search(ww.findInput.value, ww.getPathInputValue() )
-        }
-        ww.appendChild(ww.findButton, ww.top2);
-
-    }
-
 
 
 
@@ -1724,6 +1849,7 @@ var ww = ww || {};
         /**搜索选择器 */
 
         ww.creatfindSelect()
+        ww.creatfindPos()
 
 
 
@@ -1821,12 +1947,35 @@ var ww = ww || {};
         this._colorsHash = {}
     }
 
-    Highlighter.prototype.clear = function (node, keywords) { 
+    Highlighter.prototype.clear = function (node, keywords) {
         this._node = node || null
-        this._keywords = keywords || "" 
+        this._keywords = keywords || ""
         this._searchIndex = 0
+        this._words = null
         this.dehighlight()
     }
+
+
+    /**当前搜索索引 */
+    Highlighter.prototype.index = function () {
+        return this._searchIndex
+    }
+
+    /**当前搜索结果 */
+    Highlighter.prototype.result = function () {
+        return this._results
+    }
+
+    /**当前搜索键 */
+    Highlighter.prototype.keywords = function () {
+        return this._keywords
+    }
+
+    /**当前搜索键 */
+    Highlighter.prototype.words = function () {
+        return this._words
+    }
+
 
     Highlighter.prototype.search = function (node, keywords, index) {
 
@@ -1838,7 +1987,7 @@ var ww = ww || {};
             this.searchIndex(index)
 
         } else {
- 
+
             this.clear(node, keywords)
             this.highlight(node, keywords)
             this.searchStart()
@@ -1924,7 +2073,7 @@ var ww = ww || {};
 
 
             var h = (window.innerHeight || 0) * 0.1
-            ww.scrollTo(0, node.offsetTop - h)
+            ww.scrollTo(0, forkNode.offsetTop - h)
         }
 
     }
@@ -1941,7 +2090,7 @@ var ww = ww || {};
             var ki = result[5]
             var nodesname = result[6]
             var rl = result[7]
-            var keywords = this.keywords
+            var keywords = this._words
 
 
             var length = keywords ? keywords.length : 0;
@@ -1968,7 +2117,7 @@ var ww = ww || {};
         }
         this.dehighlight()
 
-        this.keywords = keywords
+        this._words = keywords
         if (!keywords) {
             return this._results
         };
@@ -2121,7 +2270,7 @@ var ww = ww || {};
         keyword.index = re.i++
         keyword.type = type
         keyword.lv = re.lv
-        keyword.father = father 
+        keyword.father = father
         keyword.rex = ww.RegexParser(keyword.word, 'i')
         keyword.rex2 = ww.RegexParser('(' + keyword.word + ')', 'gi')
         re.words.push(keyword);
@@ -2160,7 +2309,7 @@ var ww = ww || {};
         return new RegExp(m[2], type);
     };
 
-    ww.Highlighter = new Highlighter()
+    ww.highlighter = new Highlighter()
 
 
 })();
