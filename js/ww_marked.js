@@ -1754,6 +1754,20 @@ var ww = ww || {};
         ww.findPos2.onchange = function () {
             ww.findPosTo(ww.findPos2.value)
         }
+
+        var pI = ww.findInput 
+        var width = pI.offsetWidth * 0.5
+        var top = pI.offsetTop + pI.offsetHeight
+
+        var pS = ww.findPos
+        pS.style.top = pI.offsetTop + "px"
+        pS.style.left = pI.offsetLeft + width + "px"
+        pS.style.width = width + "px"  
+
+        var pS = ww.findPos2
+        pS.style.top = top + "px"
+        pS.style.left = pI.offsetLeft + "px"
+        pS.style.width = pI.offsetWidth + "px" 
     }
 
     ww.findPosTo = function (value) {
