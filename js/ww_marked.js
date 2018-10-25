@@ -328,7 +328,7 @@ var ww = ww || {};
             return 0
         }
 
-        if (!ww.canUseLSData()) {
+        if (!ww.canUseLSData(url)) {
             var md5 = ww.getFileMd5(url)
             ww._savedata.pushItem(url, [md5, data])
             ww.timeSaveWait()
@@ -405,6 +405,12 @@ var ww = ww || {};
             }
         }
         return 0
+    }
+
+    ww.haveUseLSData = function (url) {
+        var url = ww.delUrlHear(url)
+        var save = ww._savedata.getItem(url)
+        return save 
     }
 
 
