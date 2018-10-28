@@ -112,8 +112,11 @@ var ww = ww || {};
     }
 
     saveHash.prototype.delItem = function (name) {
+        var item = this._data[name]
         delete this._data[name]
         delete this._time[name]
+        console.log("delItem",name)
+        return item
     }
 
     saveHash.prototype.pushItem = function (name, data) {
@@ -304,8 +307,6 @@ var ww = ww || {};
         for (var i in data) {
             ww._savedata.pushTime(i)
         }
-
-        //console.log(data)
         for (var i in data) {
             if (!ww.canUseLSData(i)) {
                 ww._savedata.delItem(i)
@@ -316,6 +317,7 @@ var ww = ww || {};
                 ww._savedata.delItem(i)
             }
         }
+        //console.log(ww._savedata._data)
     }
 
 
