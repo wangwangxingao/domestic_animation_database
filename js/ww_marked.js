@@ -115,7 +115,7 @@ var ww = ww || {};
         var item = this._data[name]
         delete this._data[name]
         delete this._time[name]
-        console.log("delItem",name)
+        console.log("delItem", name)
         return item
     }
 
@@ -250,6 +250,9 @@ var ww = ww || {};
     /**文件 */
     ww._files = {}
     ww._fileslist = []
+    /**是列表 */
+    ww._dirFileslist = []
+    /**md5码 */
     ww._filesMd5 = {}
 
     /**
@@ -309,12 +312,12 @@ var ww = ww || {};
         }
         for (var i in data) {
             if (!ww.canUseLSData(i)) {
-                ww._savedata.delItem(i)
+                ww._savedata.setTime(i, -1)
             }
         }
         for (var i in ww._filesMd5) {
             if (!ww.canUseLSData(i)) {
-                ww._savedata.delItem(i)
+                ww._savedata.setTime(i, -1)
             }
         }
         //console.log(ww._savedata._data)
@@ -380,21 +383,25 @@ var ww = ww || {};
 
     ww.addUrlHear = function (url) {
         return url
+        /*
         var url = url || ""
         if (url.indexOf("./") == 0) {
             return url
         } else {
             return "./" + url
         }
+        */
     }
 
     ww.delUrlHear = function (url) {
         return url
+        /*
         var url = url || ""
         if (url.indexOf("./") == 0) {
             url = url.slice(2)
         }
         return url
+        */
     }
 
     ww.canUseLSData = function (url) {
@@ -412,7 +419,7 @@ var ww = ww || {};
     ww.haveUseLSData = function (url) {
         var url = ww.delUrlHear(url)
         var save = ww._savedata.getItem(url)
-        return save 
+        return save
     }
 
 
@@ -421,9 +428,7 @@ var ww = ww || {};
     * @param {*} url 链接
     * @param {*} type 种类
     * @param {*} loaded 当获得
-    * @param {*} progress 
-    * @param {*} error 
-    * @param {*} abort 
+    * @param {*} temp 临时 
     */
     ww.get = function (url, type, loaded, temp) {
         if (ww._data[url] || ww._findData[url]) {
@@ -452,6 +457,27 @@ var ww = ww || {};
             }
         }
 
+        if (temp != 2) {
+            if (ww.isUrlDir(url)) {
+                console.log(url, "无数据")
+                var t = ww.markDirMd(url)
+                if (typeof loaded == "function") {
+                    loaded(t)
+                } else {
+                    console.log(t)
+                }
+                return
+            }
+            if (!ww.getFileMd5(url)) {
+                console.log(url, "无数据")
+                if (typeof loaded == "function") {
+                    loaded("# 无数据")
+                } else {
+                    console.log("# 无数据")
+                }
+                return
+            }
+        }
         var xhr = new XMLHttpRequest();
         xhr.open('GET', url);
         xhr.responseType = (typeof (type) == "string") ? type : "arraybuffer"
@@ -503,8 +529,14 @@ var ww = ww || {};
     }
 
 
+    ww.isUrlFile = function (url) {
+        var md5 = ww.getFileMd5(url)
+        return md5
+    }
+
     ww.isUrlDir = function (url) {
-        return !ww.getFileMd5(url)
+        var md5 = ww.getFileMd5(url)
+        return md5 === 0
     }
 
     ww.getFileMd5 = function (url) {
@@ -512,7 +544,19 @@ var ww = ww || {};
         return ww._filesMd5[url]
     }
 
+    ww.markDirMd = function (url) {
+        var ul = url.split("/")
+        var t = "# 文件夹\n"
+        return t
+        /*
+        var l = ww.markFileFindList(url)
 
+        for (var i = 0; i < l.length; i++) {
+            var n = l[i]
+            t += n.slice(ul) + "  \n"
+        }
+        */
+    }
 
 
 
@@ -577,22 +621,24 @@ var ww = ww || {};
     }
 
     /**搜索 */
-    ww.search = function (keywords, data) {
+    ww.search = function (keywords, url) {
         if (keywords) {
 
             ww._keywordsList[keywords] = ww._keywordsIndex++
 
 
 
-            if (data == this.nowPath()) {
-                ww.findMarked(keywords)
-            } else {
-                if (ww.getFileMd5(data)) {
-                    ww._mustFind = [data, keywords]
-                    ww.push(data)
-
+            if (url == this.nowPath()) {
+                if (ww.isUrlDir(url)) {
+                    ww.findOnPath(keywords, url ? url + "/" : url)
                 } else {
-                    ww.findFile(keywords, data)
+                    ww.findOnMarked(keywords)
+                }
+            } else {
+                if (ww.isUrlFile(url)) {
+                    ww.findOnFile(keywords, url)
+                } else {
+                    ww.findOnPath(keywords, url)
                 }
             }
         } else {
@@ -603,27 +649,32 @@ var ww = ww || {};
 
     ww._findObj = {}
 
-    ww.findMarked = function (keywords, node) {
-        var node = node || ww.markeddiv
+    ww.findOnMarked = function (keywords, node, notnode) {
+        var node = node || ww.ele.markeddiv
 
-        ww.highlighter.search(node, keywords)
+        ww.highlighter.search(node, keywords, notnode)
 
         var index = ww.highlighter.index()
         var result = ww.highlighter.result()
 
         var all = result.length
 
-        ww.findPosOpen(index, all)
-        ww.findButton.value = all<10? "  " +all :all<100?" "+all:all
-      
+        ww.ele.findPosOpen(index, all)
+        ww.ele.findButton.value = all < 10 ? "  " + all : all < 100 ? " " + all : all
+
 
 
         //ww.highlighter.searchResult()
 
     }
 
-    /**寻找 */
-    ww.findFile = function (keywords, url) {
+    ww.findOnFile = function (keywords, url) {
+        ww._mustFind = [keywords, url]
+        ww.push(url)
+    }
+
+    /**寻找文件在位置 */
+    ww.findOnPath = function (keywords, url) {
 
         /**搜索中 不继续 */
         /*if (ww._findIndex > 0) {
@@ -654,7 +705,7 @@ var ww = ww || {};
         var list = ww.markFileFindList(url)
 
 
-        //ww.pathInput.value = ww._findText
+        //ww.ele.pathInput.value = ww._findText
         //ww.baseUrl = "./Find.md" 
         if (list.length) {
             var list = ww.setFindFiles(list)
@@ -987,28 +1038,48 @@ var ww = ww || {};
 
 
 
-    // ww.get("./js/files.json", "text", function (data) {
-    ww.get("js/files.json", "text", function (data) {
-        var json
-        try {
-            json = JSON.parse(data)
-        } catch (error) {
-            json = {}
+    /*
+    ww.markPathMd = {}
+    ww.markPathMd.markH = function (h) {
+        var h = h || 0
+        var hear = ""
+        if (h > 0 && h < 6) {
+            for (var i = 0; i < h; i++) {
+                hear += "#"
+            }
+            hear += " "
         }
-        ww._files = json
+        return hear
+    }
 
-        var re = ww.markFileList()
-        ww._fileslist = re[0]
-        ww._dirFileslist = re[1]
-        ww._filesMd5 = re[2]
+    ww.markPathMd.getFileList = function (obj, path, name, h, list) {
+        var list = list || []
 
-        ww.LSGetData()
+        var hear = localFile.markH(h) + name + "\n"
+        list.push(hear)
+        if (path == "./日记") {
+            localFile.getFileListRj(obj, path, name, h, list)
 
-        ww.creat()
-        ww.openHome()
+            return list.join("")
+        }
+
+        for (var i in obj) {
+            if (typeof obj[i] == "object") {
+                localFile.getFileList(obj[i], path + "/" + i, i, h + 1, list)
+            } else {
+                var p = (path + "/" + i).replace(/ /g, "%20")
+                var t = "" +
+                    "[" + i.slice(0, i.length - 3) + "]" +
+                    "(" + p + ")  \n"
+                list.push(t) 
+            }
+        }
+        return list.join("")
+    }*/
 
 
-    }, 2)
+
+
 
 })();
 
@@ -1031,7 +1102,7 @@ var ww = ww || {};
         ww.get(value, "text",
             function (re) {
                 ww.showmarked(re)
-                ww.findonopen()
+                ww.findOnOpen()
 
                 if (hash) {
                     //window.location.hash = "#" + hash
@@ -1071,11 +1142,11 @@ var ww = ww || {};
         return ""
     }
 
-    /**显示 */
+    /**显示 marked 结果 */
     ww.showmarked = function (text) {
         var text = text || ""
         var md = ww.marked(text)
-        ww.markeddiv.innerHTML = md
+        ww.ele.markeddiv.innerHTML = md
         ww.clearFind()
         ww.scrollTo(0, 0)
     }
@@ -1085,22 +1156,22 @@ var ww = ww || {};
     ww.clearFind = function () {
         ww.highlighter.clear()
 
-        ww.findButton.value = "搜索"
-        ww.findPosClose()
-        //ww.findButton.value = "搜索"
+        ww.ele.findButton.value = "搜索"
+        ww.ele.findPosClose()
+        //ww.ele.findButton.value = "搜索"
     }
 
+    /**显示 marked 结果  跳到最后 */
     ww.showmarked2 = function (text) {
         var text = text || ""
         var md = ww.marked(text)
-        ww.markeddiv.innerHTML = md
+        ww.ele.markeddiv.innerHTML = md
         ww.clearFind()
-
         ww.scrollToEnd()
     }
 
     /**当前位置 */
-    ww.nowPath = function (index) {
+    ww.nowPath = function () {
         return ww.getPath(ww._pathIndex)
     }
 
@@ -1111,33 +1182,38 @@ var ww = ww || {};
     }
 
     /**添加地址 */
-    ww.push = function (value) {
+    ww.push = function (url) {
 
         var path = ww.nowPath()
-        if (value == path) {
-            if (ww.findonopen()) {
+        if (url == path) {
+            if (ww.findOnOpen()) {
                 return
             }
-            ww.setPathInputValue(value)
+            ww.setPathInputValue(url)
             ww.clearFind()
             ww.scrollTo(0, 0)
             return
         }
         ww._path.length = Math.max(0, ww._pathIndex + 1)
-        ww._path.push(value)
+        ww._path.push(url)
         ww._pathIndex = ww._path.length - 1
         //console.log(ww._path, ww._pathIndex)
-        ww.open(value)
+        ww.open(url)
     }
 
 
-    ww.findonopen = function (path) {
+    /**
+     * 寻找当打开时
+     * 有 返回 1
+     * 没有 返回 0
+     */
+    ww.findOnOpen = function (path) {
         var path = path || ww.nowPath()
-        if (this._mustFind) {
-            var find = this._mustFind
+        var find = this._mustFind
+        if (find) {
             this._mustFind = 0
-            if (find[0] == path) {
-                ww.findMarked(find[1])
+            if (find[1] == path) {
+                ww.findOnMarked(find[0])
 
                 return 1
             }
@@ -1148,7 +1224,7 @@ var ww = ww || {};
 
     //滚动到
     ww.scrollTo = function (x, y, node) {
-        var node = node || ww.maindiv
+        var node = node || ww.ele.maindiv
         node.scrollLeft = x
         node.scrollTop = y
     }
@@ -1160,7 +1236,7 @@ var ww = ww || {};
 
     /**滚动到尾部 */
     ww.scrollToEnd = function (node) {
-        var node = node || ww.maindiv
+        var node = node || ww.ele.maindiv
         ww.scrollTo(0, node.scrollHeight, node)
     }
 
@@ -1225,13 +1301,13 @@ var ww = ww || {};
         //var p = "./README.md"
         var p = "README.md"
         ww.open(p)
-        ww.pathInput.value = ""
+        ww.ele.pathInput.value = ""
     }
 
     ww.toPath = function () {
-        var v = ww.getInputValue(ww.pathInput)
+        var v = ww.getInputValue(ww.ele.pathInput)
         if (v) {
-            ww.pathInput.value = v
+            ww.ele.pathInput.value = v
             ww.push(ww.addUrlHear(v))
         } else {
             ww.toHome()
@@ -1239,11 +1315,11 @@ var ww = ww || {};
     }
 
     ww.setPathInputValue = function (data) {
-        ww.pathInput.value = ww.delUrlHear(data)
+        ww.ele.pathInput.value = ww.delUrlHear(data)
     }
 
     ww.getPathInputValue = function () {
-        var data = ww.getInputValue(ww.pathInput)
+        var data = ww.getInputValue(ww.ele.pathInput)
         return ww.addUrlHear(data)
     }
 })();
@@ -1252,12 +1328,14 @@ var ww = ww || {};
 
 /**创建元素 */
 (function () {
+
+    ww.ele = {}
     /**设置打开 */
     ww.setOpen = function () {
     }
 
-    ww.maindivTopChange = function () {
-        ww.maindiv.style.top = ww.top.offsetHeight + "px"
+    ww.ele.maindivTopChange = function () {
+        ww.ele.maindiv.style.top = ww.ele.top.offsetHeight + "px"
     }
 
     ww.createElement = function (type, obj, style) {
@@ -1302,17 +1380,17 @@ var ww = ww || {};
 
     /**主要显示 */
     ww.creatmaindiv = function () {
-        ww.maindiv = document.createElement("div")
-        ww.maindiv.style = "width:100%; height:auto; position:absolute;  box-sizing:border-box; overflow-y:scroll; left:0; bottom: 0;"
-        ww.appendChild(ww.maindiv, document.body);
+        ww.ele.maindiv = document.createElement("div")
+        ww.ele.maindiv.style = "width:100%; height:auto; position:absolute;  box-sizing:border-box; overflow-y:scroll; left:0; bottom: 0;"
+        ww.appendChild(ww.ele.maindiv, document.body);
     }
 
 
     /**md浏览用的位置 */
     ww.creatmarkeddiv = function () {
-        ww.markeddiv = document.createElement("div")
-        ww.markeddiv.className = "markdown-body"
-        ww.appendChild(ww.markeddiv, ww.maindiv);
+        ww.ele.markeddiv = document.createElement("div")
+        ww.ele.markeddiv.className = "markdown-body"
+        ww.appendChild(ww.ele.markeddiv, ww.ele.maindiv);
     }
 
 
@@ -1321,16 +1399,16 @@ var ww = ww || {};
 
     /**头部工具栏 */
     ww.creattop = function () {
-        ww.top = document.createElement("div")
-        ww.top.style = "left:auto; top: 0; width:auto; position:absolute;box-sizing:border-box; "//height:10%;   overflow-y:scroll; "//"position:absolute;top: 0;box-sizing:border-box; width:100%;height:auto;overflow-y:scroll;" 
-        ww.appendChild(ww.top, document.body);
+        ww.ele.top = document.createElement("div")
+        ww.ele.top.style = "left:auto; top: 0; width:auto; position:absolute;box-sizing:border-box; "//height:10%;   overflow-y:scroll; "//"position:absolute;top: 0;box-sizing:border-box; width:100%;height:auto;overflow-y:scroll;" 
+        ww.appendChild(ww.ele.top, document.body);
 
     }
 
     /**头部工具栏1 */
     ww.creattop1 = function () {
-        ww.top1 = document.createElement("div")
-        ww.appendChild(ww.top1, ww.top);
+        ww.ele.top1 = document.createElement("div")
+        ww.appendChild(ww.ele.top1, ww.ele.top);
     }
 
 
@@ -1338,18 +1416,18 @@ var ww = ww || {};
 
     /**头部工具栏2 */
     ww.creattop2 = function () {
-        ww.top2 = document.createElement("div")
-        ww.appendChild(ww.top2, ww.top);
+        ww.ele.top2 = document.createElement("div")
+        ww.appendChild(ww.ele.top2, ww.ele.top);
     }
 
 
 
     /**位置输入  添加到 top1*/
     ww.creatpathInput = function () {
-        ww.pathInput = document.createElement("input")
-        ww.pathInput.placeholder = "全部文件"
-        ww.pathInput.type = "text"
-        ww.appendChild(ww.pathInput, ww.top1);
+        ww.ele.pathInput = document.createElement("input")
+        ww.ele.pathInput.placeholder = "全部文件"
+        ww.ele.pathInput.type = "text"
+        ww.appendChild(ww.ele.pathInput, ww.ele.top1);
 
 
     }
@@ -1359,82 +1437,82 @@ var ww = ww || {};
     /**地址选项 */
 
     ww.creatpathSelect = function () {
-        ww.pathSelect = document.createElement("select")
+        ww.ele.pathSelect = document.createElement("select")
 
-        ww.pathSelect.style.position = "absolute"
-        //ww.pathSelect.size = 1
-        ww.pathSelect.style.visibility = "hidden"
-        //ww.pathSelect.style = "left:auto; top: 0; width:auto; position:absolute; ; "
-        ww.appendChild(ww.pathSelect, ww.top1);
+        ww.ele.pathSelect.style.position = "absolute"
+        //ww.ele.pathSelect.size = 1
+        ww.ele.pathSelect.style.visibility = "hidden"
+        //ww.ele.pathSelect.style = "left:auto; top: 0; width:auto; position:absolute; ; "
+        ww.appendChild(ww.ele.pathSelect, ww.ele.top1);
 
-        ww.pathInput.onfocus = function () {
-            ww.pathSelectOpen()
+        ww.ele.pathInput.onfocus = function () {
+            ww.ele.pathSelectOpen()
         }
-        ww.pathInput.onpropertychange = function () {
-            ww.pathSelectOpen()
+        ww.ele.pathInput.onpropertychange = function () {
+            ww.ele.pathSelectOpen()
         }
 
-        ww.pathInput.oninput = function () {
-            ww.pathSelectOpen()
+        ww.ele.pathInput.oninput = function () {
+            ww.ele.pathSelectOpen()
         }
         //改变
-        ww.pathInput.onchange = function () {
-            ww.pathSelectOpen()
+        ww.ele.pathInput.onchange = function () {
+            ww.ele.pathSelectOpen()
         }
 
 
 
 
         //失去焦点
-        ww.pathInput.onblur = function () {
-            ww.pathSelect._close = true
-            setTimeout(ww.pathSelectClose, 10)
+        ww.ele.pathInput.onblur = function () {
+            ww.ele.pathSelect._close = true
+            setTimeout(ww.ele.pathSelectClose, 10)
         }
 
 
         //失去焦点
-        ww.pathSelect.onblur = function () {
-            ww.pathSelect._close = true
-            setTimeout(ww.pathSelectClose, 10)
+        ww.ele.pathSelect.onblur = function () {
+            ww.ele.pathSelect._close = true
+            setTimeout(ww.ele.pathSelectClose, 10)
         }
 
         //获得焦点 
-        ww.pathSelect.onfocus = function () {
-            ww.pathSelect._close = false
+        ww.ele.pathSelect.onfocus = function () {
+            ww.ele.pathSelect._close = false
         }
 
-        /* ww.pathSelect.onchange = function () {
+        /* ww.ele.pathSelect.onchange = function () {
             
  
          } */
 
-        /*ww.pathSelect.onclick = function () {
-            ww.pathInput.value = ww.pathSelect.value
-            ww.pathSelect.style.visibility = "hidden"
-            console.log("click", ww.pathSelect.selectedIndex)
+        /*ww.ele.pathSelect.onclick = function () {
+            ww.ele.pathInput.value = ww.ele.pathSelect.value
+            ww.ele.pathSelect.style.visibility = "hidden"
+            console.log("click", ww.ele.pathSelect.selectedIndex)
         }*/
-        ww.pathSelect.onchange = function () {
-            //console.log(ww.pathSelect.value)
-            ww.pathInput.value = ww.pathSelect.value
-            ww.pathSelectOpen()
-            //ww.pathSelect.style.visibility = "hidden"
-            // console.log("click", ww.pathSelect.selectedIndex)
+        ww.ele.pathSelect.onchange = function () {
+            //console.log(ww.ele.pathSelect.value)
+            ww.ele.pathInput.value = ww.ele.pathSelect.value
+            ww.ele.pathSelectOpen()
+            //ww.ele.pathSelect.style.visibility = "hidden"
+            // console.log("click", ww.ele.pathSelect.selectedIndex)
         }
 
     }
 
 
-    ww.pathSelectClose = function () {
-        if (ww.pathSelect._close) {
-            ww.pathSelect._close = false
-            ww.pathSelect.style.visibility = "hidden"
+    ww.ele.pathSelectClose = function () {
+        if (ww.ele.pathSelect._close) {
+            ww.ele.pathSelect._close = false
+            ww.ele.pathSelect.style.visibility = "hidden"
         }
     }
 
-    ww.pathSelectOpen = function () {
+    ww.ele.pathSelectOpen = function () {
 
-        var pI = ww.pathInput
-        var pS = ww.pathSelect
+        var pI = ww.ele.pathInput
+        var pS = ww.ele.pathSelect
 
         var value = pI.value
 
@@ -1492,13 +1570,13 @@ var ww = ww || {};
 
     /**上一个 */
     ww.creatlastButton = function () {
-        ww.lastButton = document.createElement("input")
-        ww.lastButton.type = "button"
-        ww.lastButton.value = "<"
-        ww.lastButton.onclick = function () {
+        ww.ele.lastButton = document.createElement("input")
+        ww.ele.lastButton.type = "button"
+        ww.ele.lastButton.value = "<"
+        ww.ele.lastButton.onclick = function () {
             ww.toLast()
         }
-        ww.appendChild(ww.lastButton, ww.top1);
+        ww.appendChild(ww.ele.lastButton, ww.ele.top1);
     }
 
 
@@ -1506,13 +1584,13 @@ var ww = ww || {};
 
     /**主页 */
     ww.creathomeButton = function () {
-        ww.homeButton = document.createElement("input")
-        ww.homeButton.type = "button"
-        ww.homeButton.value = "合"
-        ww.homeButton.onclick = function () {
+        ww.ele.homeButton = document.createElement("input")
+        ww.ele.homeButton.type = "button"
+        ww.ele.homeButton.value = "合"
+        ww.ele.homeButton.onclick = function () {
             ww.toHome()
         }
-        ww.appendChild(ww.homeButton, ww.top1);
+        ww.appendChild(ww.ele.homeButton, ww.ele.top1);
 
     }
 
@@ -1520,13 +1598,13 @@ var ww = ww || {};
 
     /**下一个 */
     ww.creatnextButton = function () {
-        ww.nextButton = document.createElement("input")
-        ww.nextButton.type = "button"
-        ww.nextButton.value = ">"
-        ww.nextButton.onclick = function () {
+        ww.ele.nextButton = document.createElement("input")
+        ww.ele.nextButton.type = "button"
+        ww.ele.nextButton.value = ">"
+        ww.ele.nextButton.onclick = function () {
             ww.toNext()
         }
-        ww.appendChild(ww.nextButton, ww.top1);
+        ww.appendChild(ww.ele.nextButton, ww.ele.top1);
     }
 
 
@@ -1535,13 +1613,13 @@ var ww = ww || {};
 
     /**设置打开按键 */
     ww.creatsetButton = function () {
-        ww.setButton = document.createElement("input")
-        ww.setButton.type = "button"
-        ww.setButton.value = "*"
-        ww.setButton.onclick = function () {
+        ww.ele.setButton = document.createElement("input")
+        ww.ele.setButton.type = "button"
+        ww.ele.setButton.value = "*"
+        ww.ele.setButton.onclick = function () {
             ww.setOpen()
         }
-        ww.appendChild(ww.setButton, ww.top1);
+        ww.appendChild(ww.ele.setButton, ww.ele.top1);
     }
 
 
@@ -1552,22 +1630,22 @@ var ww = ww || {};
 
     /**寻找输入 */
     ww.creatfindInput = function () {
-        ww.findInput = document.createElement("input")
-        ww.findInput.type = "text"
-        ww.findInput.value = ""
-        ww.appendChild(ww.findInput, ww.top2);
+        ww.ele.findInput = document.createElement("input")
+        ww.ele.findInput.type = "text"
+        ww.ele.findInput.value = ""
+        ww.appendChild(ww.ele.findInput, ww.ele.top2);
     }
 
     /**寻找按钮 */
 
     ww.creatfindButton = function () {
-        ww.findButton = document.createElement("input")
-        ww.findButton.type = "button"
-        ww.findButton.value = "搜索"
-        ww.findButton.onclick = function () {
-            ww.search(ww.findInput.value, ww.getPathInputValue())
+        ww.ele.findButton = document.createElement("input")
+        ww.ele.findButton.type = "button"
+        ww.ele.findButton.value = "搜索"
+        ww.ele.findButton.onclick = function () {
+            ww.search(ww.ele.findInput.value, ww.getPathInputValue())
         }
-        ww.appendChild(ww.findButton, ww.top2);
+        ww.appendChild(ww.ele.findButton, ww.ele.top2);
 
     }
 
@@ -1578,86 +1656,86 @@ var ww = ww || {};
 
 
     ww.creatfindSelect = function () {
-        ww.findSelect = document.createElement("select")
-        ww.findInput.placeholder = "请输入搜索内容"
+        ww.ele.findSelect = document.createElement("select")
+        ww.ele.findInput.placeholder = "请输入搜索内容"
 
-        ww.findSelect.style.position = "absolute"
-        //ww.findSelect.size = 1
-        ww.findSelect.style.visibility = "hidden"
-        //ww.findSelect.style = "left:auto; top: 0; width:auto; position:absolute; ; "
-        ww.appendChild(ww.findSelect, ww.top2);
+        ww.ele.findSelect.style.position = "absolute"
+        //ww.ele.findSelect.size = 1
+        ww.ele.findSelect.style.visibility = "hidden"
+        //ww.ele.findSelect.style = "left:auto; top: 0; width:auto; position:absolute; ; "
+        ww.appendChild(ww.ele.findSelect, ww.ele.top2);
 
-        ww.findInput.onfocus = function () {
-            ww.findSelectOpen()
+        ww.ele.findInput.onfocus = function () {
+            ww.ele.findSelectOpen()
         }
-        ww.findInput.onpropertychange = function () {
-            ww.findSelectOpen()
+        ww.ele.findInput.onpropertychange = function () {
+            ww.ele.findSelectOpen()
         }
 
-        ww.findInput.oninput = function () {
-            ww.findSelectOpen()
+        ww.ele.findInput.oninput = function () {
+            ww.ele.findSelectOpen()
         }
         //改变
-        ww.findInput.onchange = function () {
-            ww.findSelectOpen()
+        ww.ele.findInput.onchange = function () {
+            ww.ele.findSelectOpen()
         }
 
 
 
 
         //失去焦点
-        ww.findInput.onblur = function () {
-            ww.findSelect._close = true
-            setTimeout(ww.findSelectClose, 10, "inputblur")
+        ww.ele.findInput.onblur = function () {
+            ww.ele.findSelect._close = true
+            setTimeout(ww.ele.findSelectClose, 10, "inputblur")
         }
 
 
         //失去焦点
-        ww.findSelect.onblur = function () {
-            ww.findSelect._close = true
-            setTimeout(ww.findSelectClose, 10, "onblur")
+        ww.ele.findSelect.onblur = function () {
+            ww.ele.findSelect._close = true
+            setTimeout(ww.ele.findSelectClose, 10, "onblur")
         }
 
         //获得焦点 
-        ww.findSelect.onfocus = function () {
-            ww.findSelect._close = false
+        ww.ele.findSelect.onfocus = function () {
+            ww.ele.findSelect._close = false
         }
 
-        /* ww.findSelect.onchange = function () {
+        /* ww.ele.findSelect.onchange = function () {
             
  
          } */
 
-        /*ww.findSelect.onclick = function () {
-            ww.findInput.value = ww.findSelect.value
-            ww.findSelect.style.visibility = "hidden"
-            console.log("click", ww.findSelect.selectedIndex)
+        /*ww.ele.findSelect.onclick = function () {
+            ww.ele.findInput.value = ww.ele.findSelect.value
+            ww.ele.findSelect.style.visibility = "hidden"
+            console.log("click", ww.ele.findSelect.selectedIndex)
         }*/
 
-        ww.findSelect.onchange = function () {
-            ww.findInput.value = ww.findSelect.value
-            //ww.findSelect.style.visibility = "hidden"
-            //console.log("click", ww.findSelect.selectedIndex)
+        ww.ele.findSelect.onchange = function () {
+            ww.ele.findInput.value = ww.ele.findSelect.value
+            //ww.ele.findSelect.style.visibility = "hidden"
+            //console.log("click", ww.ele.findSelect.selectedIndex)
         }
     }
 
-    ww.findSelectClose = function () {
-        if (ww.findSelect._close) {
-            ww.findSelect._close = false
-            ww.findSelect.style.visibility = "hidden"
+    ww.ele.findSelectClose = function () {
+        if (ww.ele.findSelect._close) {
+            ww.ele.findSelect._close = false
+            ww.ele.findSelect.style.visibility = "hidden"
 
-            var pI = ww.findInput
+            var pI = ww.ele.findInput
             var value = pI.value
             if (value && value == ww.highlighter.keywords()) {
                 var index = ww.highlighter.index()
                 var result = ww.highlighter.result()
                 var all = result.length
-                ww.findButton.value = all<10? "  " +all :all<100?" "+all:all
-             
-                ww.findPosOpen(index,all)
+                ww.ele.findButton.value = all < 10 ? "  " + all : all < 100 ? " " + all : all
+
+                ww.ele.findPosOpen(index, all)
             } else {
-                ww.findPosClose()
-                ww.findButton.value = "搜索"
+                ww.ele.findPosClose()
+                ww.ele.findButton.value = "搜索"
             }
 
         }
@@ -1666,9 +1744,9 @@ var ww = ww || {};
 
 
 
-    ww.findSelectOpen = function () {
-        var pI = ww.findInput
-        var pS = ww.findSelect
+    ww.ele.findSelectOpen = function () {
+        var pI = ww.ele.findInput
+        var pS = ww.ele.findSelect
 
         var value = pI.value
 
@@ -1677,18 +1755,18 @@ var ww = ww || {};
             var index = ww.highlighter.index()
             var result = ww.highlighter.result()
             var all = result.length
-            ww.findButton.value = all<10? "  " +all :all<100?" "+all:all
-            ww.findPosClose()
+            ww.ele.findButton.value = all < 10 ? "  " + all : all < 100 ? " " + all : all
+            ww.ele.findPosClose()
         } else {
-            ww.findPosClose()
-            ww.findButton.value = "搜索"
+            ww.ele.findPosClose()
+            ww.ele.findButton.value = "搜索"
         }
 
 
         var nl = value.length
 
-        if (ww._lastfindSelect == value && ww._lastfindSelectList) {
-            var list = ww._lastfindSelectList
+        if (ww.ele._lastfindSelect == value && ww.ele._lastfindSelectList) {
+            var list = ww.ele._lastfindSelectList
         } else {
             var list = ww.markFileFindList(value, ww._keywordsList, ww._keywordsList)
             if (list.indexOf(value) != 0) {
@@ -1712,8 +1790,8 @@ var ww = ww || {};
                 }
             }
             pS.selectedIndex = 0;
-            ww._lastfindSelectList = list
-            ww._lastfindSelect = value
+            ww.ele._lastfindSelectList = list
+            ww.ele._lastfindSelect = value
 
         }
 
@@ -1733,70 +1811,70 @@ var ww = ww || {};
 
 
     ww.creatfindPos = function () {
-        ww.findPos = document.createElement("input")
-        ww.findPos.type = "number"
-        ww.findPos.min = 0
-        ww.findPos.max = 0
-        ww.findPos.step = 1
+        ww.ele.findPos = document.createElement("input")
+        ww.ele.findPos.type = "number"
+        ww.ele.findPos.min = 0
+        ww.ele.findPos.max = 0
+        ww.ele.findPos.step = 1
 
-        ww.findPos.style.position = "absolute"
-        ww.findPos.style.visibility = "hidden"
-        ww.appendChild(ww.findPos, ww.top2);
-
-
-        ww.findPos2 = document.createElement("input")
-        ww.findPos2.type = "range"
-        ww.findPos2.min = 0
-        ww.findPos2.max = 0
-        ww.findPos2.step = 1
+        ww.ele.findPos.style.position = "absolute"
+        ww.ele.findPos.style.visibility = "hidden"
+        ww.appendChild(ww.ele.findPos, ww.ele.top2);
 
 
-        ww.findPos2.style.position = "absolute"
-        ww.findPos2.style.visibility = "hidden"
-        ww.appendChild(ww.findPos2, ww.top2);
+        ww.ele.findPos2 = document.createElement("input")
+        ww.ele.findPos2.type = "range"
+        ww.ele.findPos2.min = 0
+        ww.ele.findPos2.max = 0
+        ww.ele.findPos2.step = 1
 
-        ww.findPos.onchange = function () {
-            ww.findPosTo(ww.findPos.value)
+
+        ww.ele.findPos2.style.position = "absolute"
+        ww.ele.findPos2.style.visibility = "hidden"
+        ww.appendChild(ww.ele.findPos2, ww.ele.top2);
+
+        ww.ele.findPos.onchange = function () {
+            ww.ele.findPosTo(ww.ele.findPos.value)
         }
 
-        ww.findPos2.onchange = function () {
-            ww.findPosTo(ww.findPos2.value)
+        ww.ele.findPos2.onchange = function () {
+            ww.ele.findPosTo(ww.ele.findPos2.value)
         }
 
-        var pI = ww.findInput 
+        var pI = ww.ele.findInput
         var width = pI.offsetWidth * 0.5
         var top = pI.offsetTop + pI.offsetHeight
 
-        var pS = ww.findPos
+        var pS = ww.ele.findPos
         pS.style.top = pI.offsetTop + "px"
         pS.style.left = pI.offsetLeft + width + "px"
-        pS.style.width = width + "px"  
+        pS.style.width = width + "px"
 
-        var pS = ww.findPos2
+        var pS = ww.ele.findPos2
         pS.style.top = top + "px"
         pS.style.left = pI.offsetLeft + "px"
-        pS.style.width = pI.offsetWidth + "px" 
+        pS.style.width = pI.offsetWidth + "px"
     }
 
-    ww.findPosTo = function (value) {
+    ww.ele.findPosTo = function (value) {
         var value = value * 1
-        ww.findPos.value = value
-        ww.findPos2.value = value
+        ww.ele.findPos.value = value
+        ww.ele.findPos2.value = value
         ww.highlighter.searchIndex(value)
     }
 
-    ww.findPosOpen = function (value, all) {
+    ww.ele.findPosOpen = function (value, all) {
         if (!all) {
-            ww.findPosClose()
+            ww.ele.findPosClose()
             return
         }
-        var pI = ww.findInput
+        var pI = ww.ele.findInput
 
 
         var width = pI.offsetWidth * 0.5
         var top = pI.offsetTop + pI.offsetHeight
 
-        var pS = ww.findPos
+        var pS = ww.ele.findPos
         pS.style.top = pI.offsetTop + "px"
         pS.style.left = pI.offsetLeft + width + "px"
         pS.style.width = width + "px"
@@ -1805,7 +1883,7 @@ var ww = ww || {};
         pS.value = value
         pS.max = all
 
-        var pS = ww.findPos2
+        var pS = ww.ele.findPos2
         pS.style.top = pI.offsetTop + pI.offsetHeight + "px"
         pS.style.left = pI.offsetLeft + "px"
         pS.style.width = pI.offsetWidth + "px"
@@ -1817,10 +1895,10 @@ var ww = ww || {};
     }
 
 
-    ww.findPosClose = function () {
-        var pS = ww.findPos
+    ww.ele.findPosClose = function () {
+        var pS = ww.ele.findPos
         pS.style.visibility = "hidden"
-        var pS = ww.findPos2
+        var pS = ww.ele.findPos2
         pS.style.visibility = "hidden"
     }
 
@@ -1835,7 +1913,7 @@ var ww = ww || {};
         ww.openButton.onclick = function () {
             ww.toPath()
         }
-        ww.appendChild(ww.openButton, ww.top2);
+        ww.appendChild(ww.openButton, ww.ele.top2);
     }
 
 
@@ -1884,10 +1962,10 @@ var ww = ww || {};
 
 
 
-        ww.maindivTopChange()
+        ww.ele.maindivTopChange()
         /**绑定高 */
         window.onresize = function () {
-            ww.maindivTopChange()
+            ww.ele.maindivTopChange()
         }
 
     }
@@ -1925,7 +2003,7 @@ var ww = ww || {};
             ww.css.setAttribute("href", value)
         }
  
-        //ww.top1.appendChild(ww.cssSelect);
+        //ww.ele.top1.appendChild(ww.cssSelect);
  
     } 
     */
@@ -1974,6 +2052,7 @@ var ww = ww || {};
         this._keywords = keywords || ""
         this._searchIndex = 0
         this._words = null
+        this._notnode = 0
         this.dehighlight()
     }
 
@@ -1999,7 +2078,7 @@ var ww = ww || {};
     }
 
 
-    Highlighter.prototype.search = function (node, keywords, index) {
+    Highlighter.prototype.search = function (node, keywords, notnode, index) {
 
         if (this._keywords == keywords && this._node == node) {
             if (index === undefined) {
@@ -2011,7 +2090,7 @@ var ww = ww || {};
         } else {
 
             this.clear(node, keywords)
-            this.highlight(node, keywords)
+            this.highlight(node, keywords, notnode)
             this.searchStart()
         }
         return this._results
@@ -2020,7 +2099,7 @@ var ww = ww || {};
 
 
     Highlighter.prototype.dehighlight = function () {
-
+        this._results = this._results || []
         var result
         while (result = this._results.pop()) {
             //console.log(result)
@@ -2110,13 +2189,11 @@ var ww = ww || {};
             var forkNode = result[3]
             var keyword = result[4]
             var ki = result[5]
-            var nodesname = result[6]
-            var rl = result[7]
-            var keywords = this._words
+            var words = this._words
 
 
-            var length = keywords ? keywords.length : 0;
-            this.colorNodeText(0, forkNode, childNode, keywords, length, 0, type, nodesname)
+            var length = words ? words.length : 0;
+            this.colorNodeText(0, forkNode, childNode, words, length, 0, type)
 
         }
     }
@@ -2130,74 +2207,107 @@ var ww = ww || {};
      * var hl = new Highlighter(); 
      * hl.highlight(document.body, '这个 世界 需要 和平'); 
      */
-    Highlighter.prototype.highlight = function (node, keywords) {
+    Highlighter.prototype.highlight = function (node, keywords, notnode) {
 
         if (!keywords || !node || !node.nodeType || node.nodeType != 1) {
-            keywords = null
+            var words = null
         } else {
-            keywords = this.parsewords(keywords);
+            var words = this.parsewords(keywords);
         }
         this.dehighlight()
 
-        this._words = keywords
-        if (!keywords) {
+        this._words = words
+        if (!words) {
             return this._results
         };
 
-        var length = keywords ? keywords.length : 0;
-        this.colorNode(node, keywords, length, 1);
+        var length = words ? words.length : 0;
+
+        var push = 1
+        var colortype = 0
+
+        var notnode = notnode
+        this.colorNode(node, words, length, push, colortype, notnode);
 
         console.log(this._results)
         return this._results
     }
 
-    /** 
-     * 对所有#text的node进行查找，如果有关键字则进行着色 
-     * @param {} node 节点 
-     * @param {} keyword 关键字结构体，包含了关键字、前景色、背景色 
+    /**  
+     * 对所有#text的node进行查找，如果有关键字则进行着色  
+     * @param {element} node 节点 
+     * @param {[]} words 关键字结构体，包含了关键字、前景色、背景色 
+     * @param {number} leng 长度
+     * @param {boolean} push 添加
+     * @param {number} colortype 种类
+     * 
      */
-    Highlighter.prototype.colorNode = function (node, keywords, leng, push, type, nodesname) {
+    Highlighter.prototype.colorNode = function (node, words, leng, push, colortype, notnode) {
+
+        if (notnode) {
+            var nt = node.tagName
+            var notnt = typeof notnode
+            console.log(nt, notnode)
+            if (notnt == "string") {
+                if (nt == notnode) {
+                    var notnode = 0
+                }
+            } else if (notnt == "object") {
+                if (Array.isArray(notnode)) {
+                    if (notnode.indexOf(nt) >= 0) {
+                        var notnode = 0
+                    }
+                } else {
+                    if (nt in notnode) {
+                        var notnode = notnode[nt]
+                    }
+                }
+            }
+            console.log(nt, notnode)
+        }
         //var nodesname = (nodesname || "") + node.tagName + ","
         //console.log(nodesname)
         for (var i = 0; i < node.childNodes.length; i++) {
             var childNode = node.childNodes[i];
             if (childNode.nodeType == 3) {
                 //childNode is #text    
-                this.colorNodeText(node, 0, childNode, keywords, leng, push, type, nodesname)
+                if (!notnode) {
+                    this.colorNodeText(node, 0, childNode, words, leng, push, colortype, notnode)
+                }
             } else if (childNode.nodeType == 1) {
                 //childNode is element  
-                this.colorNode(childNode, keywords, leng, push, type, nodesname);
+                this.colorNode(childNode, words, leng, push, colortype, notnode);
             }
         }
     }
 
-    Highlighter.prototype.colorNodeText = function (node, forkNode, childNode, keywords, leng, push, type, nodesname) {
+    Highlighter.prototype.colorNodeText = function (node, forkNode, childNode, words, leng, push, colortype, notnode) {
         if (forkNode) {
             forkNode.innerHTML = childNode.data
         }
         for (var ki = leng - 1; ki >= 0; ki--) {
-            var keyword = keywords[ki]
+            var word = words[ki]
             /*
             //筛选tagname时使用
             if (this._must && nodesname.indexOf(this._must) < 0) {
                 continue
             }*/
-            var re = keyword.rex
+            var re = word.rex
             if (childNode.data.search(re) == -1) {
                 continue
             } else {
                 var forkNode = forkNode || document.createElement('span');
-                var re = keyword.rex2
+                var re = word.rex2
                 forkNode.innerHTML = childNode.data.replace(
-                    re, this.span(keyword, type)
+                    re, this.span(word, colortype)
                 );
 
                 node && node.replaceChild(forkNode, childNode);
                 if (push) {
                     //console.log(node, childNode, forkNode, nodesname)
-                    this._results.push([childNode.data, node, childNode, forkNode, keyword, ki, nodesname, this._results.length])
+                    this._results.push([childNode.data, node, childNode, forkNode, word, ki, notnode, this._results.length])
                 }
-                this.colorNode(forkNode, keywords, ki, 0, type, nodesname)
+                this.colorNode(forkNode, words, ki, 0, colortype, notnode)
                 break
             }
         }
@@ -2206,19 +2316,19 @@ var ww = ww || {};
 
 
 
-    Highlighter.prototype.span = function (keyword, type) {
+    Highlighter.prototype.span = function (word, colortype) {
 
-        var colorname = this._colors[keyword.index % this._colors.length]
+        var colorname = this._colors[word.index % this._colors.length]
         var color = this._colorsHash[colorname] = colorname.split(",")
 
-        var type = type ? 2 : 0
+        var colortype = colortype ? 2 : 0
 
         var span = '<span ' +
             'style=' +
-            'background-color:' + color[0 + type] +
-            ';color:' + color[1 + type] +
-            ' mce_style=background-color:' + color[0 + type] +
-            ';color:' + color[1 + type] + '>' + '$1' +
+            'background-color:' + color[0 + colortype] +
+            ';color:' + color[1 + colortype] +
+            ' mce_style=background-color:' + color[0 + colortype] +
+            ';color:' + color[1 + colortype] + '>' + '$1' +
             '</span>'
 
         return span
@@ -2255,7 +2365,7 @@ var ww = ww || {};
 
     /**
      * 
-     * 
+     * 解析词
      * 
      * 
      */
@@ -2336,4 +2446,33 @@ var ww = ww || {};
 
 })();
 
+(function () {
+    // ww.get("./js/files.json", "text", function (data) {
+    ww.get("js/files.json", "text", function (data) {
+        var json
+        try {
+            json = JSON.parse(data)
+        } catch (error) {
+            json = {}
+        }
+        ww._files = json
 
+        var re = ww.markFileList()
+        /**文件列表 */
+        ww._fileslist = re[0]
+        /**文件夹+文件列表 */
+        ww._dirFileslist = re[1]
+        /**md5码 文件夹为0*/
+        ww._filesMd5 = re[2]
+        /**文件夹内容列表 */
+        ww._dirFiles = re[3]
+
+        console.log(re)
+        ww.LSGetData()
+
+        ww.creat()
+        ww.openHome()
+
+
+    }, 2)
+})();
