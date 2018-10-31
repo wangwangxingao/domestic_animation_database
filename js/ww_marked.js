@@ -649,10 +649,10 @@ var ww = ww || {};
 
     ww._findObj = {}
 
-    ww.findOnMarked = function (keywords, node, notnode) {
+    ww.findOnMarked = function (keywords, node) {
         var node = node || ww.ele.markeddiv
 
-        ww.highlighter.search(node, keywords, notnode)
+        ww.highlighter.search(node, keywords)
 
         var index = ww.highlighter.index()
         var result = ww.highlighter.result()
@@ -980,14 +980,13 @@ var ww = ww || {};
     /**生成寻找方法 */
     ww.markfind = function (keywords) {
         var re = ww.parsewords(keywords)
-        if (Array.isArray(re) && re.length) {
-
-
+        if (re && Array.isArray(re.words) && re.words.length) {
+            var words = re.words
             return function (text) {
                 if (text) {
                     var r = Infinity
-                    for (var i = 0; i < re.length; i++) {
-                        var set = re[i]
+                    for (var i = 0; i < words.length; i++) {
+                        var set = words[i]
                         if (!set || !set.rex) { continue }
                         var rex = set.rex
                         var index = text.search(rex)
@@ -1871,12 +1870,12 @@ var ww = ww || {};
         var pI = ww.ele.findInput
 
 
-        var width = pI.offsetWidth * 0.5
+        var width = pI.offsetWidth * 0.3
         var top = pI.offsetTop + pI.offsetHeight
 
         var pS = ww.ele.findPos
         pS.style.top = pI.offsetTop + "px"
-        pS.style.left = pI.offsetLeft + width + "px"
+        pS.style.left = pI.offsetLeft + pI.offsetWidth - width + "px"
         pS.style.width = width + "px"
         pS.style.visibility = "visible"
 
@@ -2017,42 +2016,67 @@ var ww = ww || {};
 (function () {
 
     /** 
-     * 高亮显示关键字, 构造函数 
-     * @param {} colors 颜色数组，其中每个元素是一个 '背景色,前景色' 组合 
+     * 高亮显示关键字, 构造函数   
      */
-    function Highlighter(colors) {
+    function Highlighter() {
         this._node = null
         this._keywords = ""
         this._searchIndex = 0
         this._results = []
-        this._colors = colors;
-        if (!this._colors) {
-            //默认颜色  
-            this._colors = [
-                '#6894b5,#000000,#ffff00,#000000',
-                '#68bbb5,#000000,#ffff00,#000000',
-                '#7983ab,#000000,#ffff00,#000000',
-                '#dae9d1,#000000,#ffff00,#000000',
-                '#eabcf4,#000000,#ffff00,#000000',
-                '#c8e5ef,#000000,#ffff00,#000000',
-                '#f3e3cb,#000000,#ffff00,#000000',
-                '#e7cfe0,#000000,#ffff00,#000000',
-                '#c5d1f1,#000000,#ffff00,#000000',
-                '#deeee4,#000000,#ffff00,#000000',
-                '#b55ed2,#000000,#ffff00,#000000',
-                '#dcb7a0,#333333,#ffff00,#000000',
-                '#ffff00,#000000,#ffff00,#000000',
-            ];
-        }
+
+        this._colors = [
+            'rgba(255,0,0,0.5);#000000;#ffff00;#000000',
+            '#68bbb5;#000000;#ffff00;#000000',
+            '#7983ab;#000000;#ffff00;#000000',
+            '#dae9d1;#000000;#ffff00;#000000',
+            '#eabcf4;#000000;#ffff00;#000000',
+            '#c8e5ef;#000000;#ffff00;#000000',
+            '#f3e3cb;#000000;#ffff00;#000000',
+            '#e7cfe0;#000000;#ffff00;#000000',
+            '#c5d1f1;#000000;#ffff00;#000000',
+            '#deeee4;#000000;#ffff00;#000000',
+            '#b55ed2;#000000;#ffff00;#000000',
+            '#dcb7a0;#333333;#ffff00;#000000',
+            '#ffff00;#000000;#ffff00;#000000',
+        ];
+
+        this._colorsType = {}
+        this.colorSet("", this._colors)
+
         this._colorsHash = {}
     }
+
+
+    Highlighter.prototype.colorSet = function (name, colors) {
+        if (Array.isArray(colors)) {
+            var arr = colors
+        } else {
+            try {
+                var arr = JSON.parse(colors)
+            } catch (error) {
+                var arr = [colors]
+            }
+        }
+        this._colorsType[name] = arr
+    }
+
+    Highlighter.prototype.colorGet = function (name) {
+        if (Array.isArray(this._colorsType[name]) && this._colorsType[name] > 0) {
+            return this._colorsType[name]
+        } else {
+            return this._colors
+        }
+
+    }
+
 
     Highlighter.prototype.clear = function (node, keywords) {
         this._node = node || null
         this._keywords = keywords || ""
         this._searchIndex = 0
         this._words = null
-        this._notnode = 0
+        this._notnode = false
+        this._colorName = ""
         this.dehighlight()
     }
 
@@ -2078,7 +2102,7 @@ var ww = ww || {};
     }
 
 
-    Highlighter.prototype.search = function (node, keywords, notnode, index) {
+    Highlighter.prototype.search = function (node, keywords, index) {
 
         if (this._keywords == keywords && this._node == node) {
             if (index === undefined) {
@@ -2090,7 +2114,7 @@ var ww = ww || {};
         } else {
 
             this.clear(node, keywords)
-            this.highlight(node, keywords, notnode)
+            this.highlight(node, keywords)
             this.searchStart()
         }
         return this._results
@@ -2176,24 +2200,32 @@ var ww = ww || {};
             var h = (window.innerHeight || 0) * 0.1
             ww.scrollTo(0, forkNode.offsetTop - h)
         }
-
     }
 
 
     Highlighter.prototype.changeforkNode = function (type) {
         if (this._lastFind) {
+            console.log(type)
             result = this._lastFind
             var data = result[0]
             var node = result[1]
             var childNode = result[2]
             var forkNode = result[3]
-            var keyword = result[4]
+            var word = result[4]
             var ki = result[5]
+            var notnode = result[6]
+            var colorName = result[7]
+            var colortype = result[8]
+            var l = result[9]
+
             var words = this._words
 
-
             var length = words ? words.length : 0;
-            this.colorNodeText(0, forkNode, childNode, words, length, 0, type)
+            var push = 0
+            var type = type
+
+ 
+            this.colorNodeText(0, forkNode, childNode, words, length, push, notnode, colorName, type)
 
         }
     }
@@ -2207,27 +2239,36 @@ var ww = ww || {};
      * var hl = new Highlighter(); 
      * hl.highlight(document.body, '这个 世界 需要 和平'); 
      */
-    Highlighter.prototype.highlight = function (node, keywords, notnode) {
+    Highlighter.prototype.highlight = function (node, keywords) {
 
         if (!keywords || !node || !node.nodeType || node.nodeType != 1) {
-            var words = null
+            var re = null
         } else {
-            var words = this.parsewords(keywords);
+            var re = this.parsewords(keywords);
         }
         this.dehighlight()
-
-        this._words = words
-        if (!words) {
+        if (re) {
+            this._notnode = re.n
+            this._colorName = re.c
+            this._words = re.words
+        } else {
+            this._notnode = 0
+            this._colorName = ""
+            this._words = null
+        }
+        if (!this._words) {
             return this._results
         };
 
+        var words = this._words
         var length = words ? words.length : 0;
-
         var push = 1
+
+        var notnode = this._notnode
+        var colorName = this._colorName
         var colortype = 0
 
-        var notnode = notnode
-        this.colorNode(node, words, length, push, colortype, notnode);
+        this.colorNode(node, words, length, push, notnode, colorName, colortype);
 
         console.log(this._results)
         return this._results
@@ -2242,28 +2283,20 @@ var ww = ww || {};
      * @param {number} colortype 种类
      * 
      */
-    Highlighter.prototype.colorNode = function (node, words, leng, push, colortype, notnode) {
+    Highlighter.prototype.colorNode = function (node, words, leng, push, notnode, colorName, colortype) {
 
         if (notnode) {
             var nt = node.tagName
             var notnt = typeof notnode
-            console.log(nt, notnode)
             if (notnt == "string") {
-                if (nt == notnode) {
-                    var notnode = 0
-                }
+                if (nt == notnode) { var notnode = 0 }
             } else if (notnt == "object") {
                 if (Array.isArray(notnode)) {
-                    if (notnode.indexOf(nt) >= 0) {
-                        var notnode = 0
-                    }
+                    if (notnode.indexOf(nt) >= 0) { var notnode = 0 }
                 } else {
-                    if (nt in notnode) {
-                        var notnode = notnode[nt]
-                    }
+                    if (nt in notnode) { var notnode = notnode[nt] }
                 }
             }
-            console.log(nt, notnode)
         }
         //var nodesname = (nodesname || "") + node.tagName + ","
         //console.log(nodesname)
@@ -2272,16 +2305,22 @@ var ww = ww || {};
             if (childNode.nodeType == 3) {
                 //childNode is #text    
                 if (!notnode) {
-                    this.colorNodeText(node, 0, childNode, words, leng, push, colortype, notnode)
+                    this.colorNodeText(node, 0, childNode, words, leng, push, notnode, colorName, colortype)
                 }
             } else if (childNode.nodeType == 1) {
                 //childNode is element  
-                this.colorNode(childNode, words, leng, push, colortype, notnode);
+                this.colorNode(childNode, words, leng, push, notnode, colorName, colortype);
             }
         }
     }
 
-    Highlighter.prototype.colorNodeText = function (node, forkNode, childNode, words, leng, push, colortype, notnode) {
+    /**
+     * 
+     * @param {Element|0} node
+     *  
+     * 
+     */
+    Highlighter.prototype.colorNodeText = function (node, forkNode, childNode, words, leng, push, notnode, colorName, colortype) {
         if (forkNode) {
             forkNode.innerHTML = childNode.data
         }
@@ -2299,15 +2338,15 @@ var ww = ww || {};
                 var forkNode = forkNode || document.createElement('span');
                 var re = word.rex2
                 forkNode.innerHTML = childNode.data.replace(
-                    re, this.span(word, colortype)
+                    re, this.span(word, colorName, colortype)
                 );
 
                 node && node.replaceChild(forkNode, childNode);
                 if (push) {
                     //console.log(node, childNode, forkNode, nodesname)
-                    this._results.push([childNode.data, node, childNode, forkNode, word, ki, notnode, this._results.length])
-                }
-                this.colorNode(forkNode, words, ki, 0, colortype, notnode)
+                    this._results.push([childNode.data, node, childNode, forkNode, word, ki, notnode, colorName, colortype, this._results.length])
+                } 
+                this.colorNode(forkNode, words, ki, 0,  notnode, colorName, colortype)
                 break
             }
         }
@@ -2316,26 +2355,60 @@ var ww = ww || {};
 
 
 
-    Highlighter.prototype.span = function (word, colortype) {
+    Highlighter.prototype.span = function (word, colorName, colortype) {
 
-        var colorname = this._colors[word.index % this._colors.length]
-        var color = this._colorsHash[colorname] = colorname.split(",")
+        var colors = this.colorGet(colorName)
+
+        var cn = colors[word.index % colors.length]
+        var cl = this._colorsHash[cn] = this._colorsHash[cn] || (cn || "").split(";")
 
         var colortype = colortype ? 2 : 0
-
+        console.log(cn,colortype)
         var span = '<span ' +
             'style=' +
-            'background-color:' + color[0 + colortype] +
-            ';color:' + color[1 + colortype] +
-            ' mce_style=background-color:' + color[0 + colortype] +
-            ';color:' + color[1 + colortype] + '>' + '$1' +
+            'background-color:' + cl[0 + colortype] +
+            ';color:' + cl[1 + colortype] +
+            ' mce_style=background-color:' + cl[0 + colortype] +
+            ';color:' + cl[1 + colortype] + '>' + '$1' +
             '</span>'
 
         return span
     }
 
 
+    Highlighter.prototype.parseNotNode = function (keywords) {
+        var c = ""
+        var n = ""
+        var keywords = keywords || ""
+        var rexc = /\@c\{(.*?)\} *$/
+        var arr = rexc.exec(keywords);
+        if (arr) {
+            var l = arr[0].length
+            keywords = keywords.slice(0, keywords.length - l)
+            c = arr[1]
+        }
+        var keywords = keywords || ""
+        var rexn = /\@n\{(.*?)\} *$/
+        var arr = rexn.exec(keywords);
+        if (arr) {
+            var l = arr[0].length
+            keywords = keywords.slice(0, keywords.length - l)
+            try {
+                n = JSON.parse(arr[1])
+            } catch (error) {
+                n = arr[1]
+            }
+        }
 
+        var keywords = keywords || ""
+        var arr = rexc.exec(keywords);
+        if (arr) {
+            var l = arr[0].length
+            keywords = keywords.slice(0, keywords.length - l)
+            c = arr[1]
+        }
+        return { k: keywords, c: c, n: n }
+    }
 
 
     /** 
@@ -2344,6 +2417,11 @@ var ww = ww || {};
      * @return {} 
      */
     Highlighter.prototype.parsewords = function (keywords) {
+
+        var r = this.parseNotNode(keywords)
+        var keywords = r.k
+        var c = r.c
+        var n = r.n
         var json = ""
         try {
             var json = JSON.parse(keywords)
@@ -2356,8 +2434,10 @@ var ww = ww || {};
         var re = this.parseword(json, type, 0, 0)
 
         if (re && re.words.length) {
+            re.c = c
+            re.n = n
             //console.log(re.words)
-            return re.words
+            return re
         }
         return null;
     }
