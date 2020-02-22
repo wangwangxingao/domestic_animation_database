@@ -10,13 +10,15 @@
 <!-- 引入 echarts.js -->
 <script src="js/jQuery.js"></script>
 <script src="js/echarts.min.js"></script>
-</head> 
-<body> 
-    
-    <input type="button" value="进入国产动画数据库" style="font-size: 50;width: 200px;height: 50px;" onclick='location.href="./home.html"'></input>
-   
+</head>
+
+<body>
+
+    <input type="button" value="进入国产动画数据库" style="font-size: 50;width: 200px;height: 50px;"
+        onclick='location.href="./home.html"'></input>
+
     <!-- 为ECharts准备一个具备大小（宽高）的Dom -->
-    <div id="main" style="width: 600px;height:480px;"></div>
+    <div id="main" style="width: 800px;height:600px;"></div>
     <script type="text/javascript">
         make = function (l) {
             var l2 = []
@@ -25,8 +27,8 @@
             for (var i = l.length; i--;) {
                 var e = l[i];
                 e.time = new Date(e.ReleaseTime)
-                //if (e.time > t && e.time < t2)  
-                if (e.SumBoxOffice > 0.00001) l2.push(e) 
+               // if (e.time > t && e.time < t2) 
+                if (e.SumBoxOffice > 0.00001) l2.push(e)
             }
             return l2
         }
@@ -37,12 +39,15 @@
                 var e = l[i];
                 if (e) {
                     v += e.SumBoxOffice
-                } 
+                }
             }
             return v
         }
 
+        var runing
         run = function () {
+            if (runing) { return }
+            runing = 1
             $.get("js/2020数据库.json", function (data) {
 
                 var data = make(data)
@@ -50,9 +55,14 @@
                 var myChart = echarts.init($("#main")[0]);
 
 
-                data.sort(function (a, b) {
-                    return a.time - b.time
-                })
+                /*data.sort(function (a, b) {
+                    if (a.SumBoxOffice > 500000) {
+                        return 10000000000000000000
+                    }else if(b.SumBoxOffice>500000){
+                        return -10000000000000000000 
+                    }
+                    return a.time - b.time>0?1:a.time - b.time ==0 ?a.SumBoxOffice-b.SumBoxOffice :-1
+                })*/
                 var option = {
                     title: {
                         text: "          国产动画电影票房"  //'ECharts 入门示例'
@@ -62,27 +72,27 @@
                         source: data
                     },
                     dataZoom: [
-                         {
-                             filterMode: "none",
-                             show: true,
-                             realtime: true,
-                             start: 0,
-                             end: 100
-                         },
-                         {
-                             type: 'inside',
-                             realtime: true,
-                             start: 0,
-                             end: 100
-                         }
-                     ], 
+                        {
+                            filterMode: "none",
+                            show: true,
+                            realtime: true,
+                            start: 0,
+                            end: 100
+                        },
+                        {
+                            type: 'inside',
+                            realtime: true,
+                            start: 0,
+                            end: 100
+                        }
+                    ],
                     xAxis: {
                         type: 'time',
                         //min: "2019-1-1",
                         //max: "2020-1-1",
                     },
                     yAxis: {
-                        min: 0.000000001
+                        //min: 0.000000001
                         //interval:10000,
                     },
                     series: [{
@@ -110,27 +120,28 @@
                 }
                 myChart.setOption(option);
 
-                /* var l = []
-                 setOption = function () {
-                     var d = data.shift()
-                     if (!d) {
-                         option.title.text = `              2019年国产动画电影票房`
-                     } else {
-                         setTimeout(setOption, 100);
-                         l.push(d)
-                         option.title.text = `              ${d.ReleaseTime}  ${d.MovieName}  ${d.SumBoxOffice}万`
-                     }
-                     // 指定图表的配置项和数据
-                     option.dataset.source = l
-                     // 使用刚指定的配置项和数据显示图表。
-                     myChart.setOption(option);
-                 }
-                 setTimeout(setOption, 0)
-                 */
+                var l = []
+                setOption = function () {
+                    var d = data.shift()
+                    if (!d) {
+                        option.title.text = `              2019年国产动画电影票房`
+                    } else {
+                        setTimeout(setOption, 1000);
+                        l.push(d)
+                        option.title.text = `              ${d.ReleaseTime}  ${d.MovieName}  ${d.SumBoxOffice}万`
+                    }
+                    // 指定图表的配置项和数据
+                    option.dataset.source = l
+                    // 使用刚指定的配置项和数据显示图表。
+                    myChart.setOption(option);
+                }
+                //setTimeout(setOption, 0)
+
             }, "json")
         }
         run()
 
+        //document.body.addEventListener("click", run)
 
     </script>
 </body>
