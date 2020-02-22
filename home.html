@@ -1,138 +1,37 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 
 <head>
+    <meta charset="utf-8">
+    <title>国产动画资料库</title>
+    <script type="text/javascript" src="./js/lzstring.js"></script>
+    <script type="text/javascript" src="./js/marked.min.js"></script>
+</head>
 
-<body bgcolor="#fff"></body>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>国产动画电影票房</title>
-<!-- 引入 echarts.js -->
-<script src="js/jQuery.js"></script>
-<script src="js/echarts.min.js"></script>
-</head> 
-<body> 
-    
-    <input type="button" value="进入国产动画数据库" style="font-size: 50;width: 200px;height: 50px;" onclick='location.href="./index.html"'></input>
-   
-    <!-- 为ECharts准备一个具备大小（宽高）的Dom -->
-    <div id="main" style="width: 600px;height:480px;"></div>
-    <script type="text/javascript">
-        make = function (l) {
-            var l2 = []
-            var t = new Date("2018-12-31")
-            var t2 = new Date("2020-1-1")
-            for (var i = l.length; i--;) {
-                var e = l[i];
-                e.time = new Date(e.ReleaseTime)
-                //if (e.time > t && e.time < t2)  
-                if (e.SumBoxOffice > 0.00001) l2.push(e) 
+<body>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        .markdown-body {
+            box-sizing: border-box;
+            min-width: 200px;
+            max-width: 980px;
+            margin: 0 auto;
+            padding: 45px;
+        }
+
+        @media (max-width: 767px) {
+            .markdown-body {
+                padding: 15px;
             }
-            return l2
         }
-        all = function (l) {
-
-            var v = 0
-            for (var i = l.length; i--;) {
-                var e = l[i];
-                if (e) {
-                    v += e.SumBoxOffice
-                } 
-            }
-            return v
-        }
-
-        run = function () {
-            $.get("js/2020数据库.json", function (data) {
-
-                var data = make(data)
-                // 基于准备好的dom，初始化echarts实例
-                var myChart = echarts.init($("#main")[0]);
-
-
-                data.sort(function (a, b) {
-                    return a.time - b.time
-                })
-                var option = {
-                    title: {
-                        text: "          国产动画电影票房"  //'ECharts 入门示例'
-                    },
-                    tooltip: {},
-                    dataset: {
-                        source: data
-                    },
-                    dataZoom: [
-                         {
-                             filterMode: "none",
-                             show: true,
-                             realtime: true,
-                             start: 0,
-                             end: 100
-                         },
-                         {
-                             type: 'inside',
-                             realtime: true,
-                             start: 0,
-                             end: 100
-                         }
-                     ], 
-                    xAxis: {
-                        type: 'time',
-                        //min: "2019-1-1",
-                        //max: "2020-1-1",
-                    },
-                    yAxis: {
-                        min: 0.000000001
-                        //interval:10000,
-                    },
-                    series: [{
-                        name: '票房',
-                        /*label:{
-                            show:true,
-                            formatter:"{@MovieName}\n{@ReleaseTime}\n{@SumBoxOffice}"
-                        },*/
-                        type: 'scatter',
-                        encode: {
-                            // 将 "amount" 列映射到 X 轴。
-                            x: "ReleaseTime",
-                            // 将 "product" 列映射到 Y 轴。
-                            y: 'SumBoxOffice'
-                        },
-                        tooltip: {
-                            trigger: 'item',
-                            formatter: function (params) {
-                                var v = params.value;
-                                `${v}`
-                                return `${v["MovieName"]}<br>${v["ReleaseTime"]}<br>票房:${v["SumBoxOffice"]}`
-                            }
-                        }
-                    }]
-                }
-                myChart.setOption(option);
-
-                /* var l = []
-                 setOption = function () {
-                     var d = data.shift()
-                     if (!d) {
-                         option.title.text = `              2019年国产动画电影票房`
-                     } else {
-                         setTimeout(setOption, 100);
-                         l.push(d)
-                         option.title.text = `              ${d.ReleaseTime}  ${d.MovieName}  ${d.SumBoxOffice}万`
-                     }
-                     // 指定图表的配置项和数据
-                     option.dataset.source = l
-                     // 使用刚指定的配置项和数据显示图表。
-                     myChart.setOption(option);
-                 }
-                 setTimeout(setOption, 0)
-                 */
-            }, "json")
-        }
-        run()
+    </style>
+    <script type="text/javascript" src="./js/core.js"></script>
+    <script>
+  
 
 
     </script>
+
 </body>
 
 </html>
