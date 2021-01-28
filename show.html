@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+<body bgcolor="#fff"></body>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>国产动画电影票房</title>
+<!-- 引入 echarts.js -->
+<script src="js/jQuery.js"></script>
+<script src="js/echarts.min.js"></script>
+</head>
+
+<body>
+
+    <!-- 为ECharts准备一个具备大小（宽高）的Dom -->
+    <div id="main" style="width: 800px;height:600px;top:50px;"></div>
+    <script type="text/javascript">
+
+        color = {
+            "中国": "#f43e06",
+            "日本": "#7e1671",
+            "美国": "#1677b3",
+        }
+        colors = "#336633,#990033,#FFCC99,#33CC33,#6666CC,#CCCC33,#CCFFCC,#FFCC99,#CCFF99,#CCCCCC,#CCCC00,#999966,#FF6666,#FFFF00,#006699".split(",")
+
+        make = function (l) {
+            var l2 = []
+            var t = new Date("2019-12-31")
+            var t2 = new Date("2021-1-1")
+            for (var i in l) {
+                var d = l[i];
+
+                e = d && d.info && d.info.Table && d.info.Table[0]
+                console.log(e)
+                if (e) {
+
+                    e.countrys = (e.MovieCountry || '').replace(/\/|\d+/g, "").split('|') 
+                    e.countrys.pop()
+                    e.country = e.countrys[0] || "中国"
+                    e.countryt = e.countrys.join(",")
+                    e.time = new Date(e.ReleaseTime)
+                    if (e.time > t && e.time < t2) {
+                        if (e.SumBoxOffice > 0.00001) l2.push(e)
+                    }
+                }
+            }
+            return l2
+        }
+        all = function (l) {
+
+            var v = 0
+            for (var i = l.length; i--;) {
+                var e = l[i];
+                if (e) {
+                    v += e.SumBoxOffice
+                }
+            }
+            return v
+        }
+        getColor = function (c) {
+            if (!color[c]) {
+                color[c] = colors.shift()
+            }
+            return color[c];
+
+        }
+        var runing
+        run = function () {
+            if (runing) { return }
+            runing = 1
+            $.get("程序/详细数据 (2).json", function (data) {
+
+                var data = make(JSON.parse(data))
+                console.log(data)
+                // 基于准备好的dom，初始化echarts实例
+                var myChart = echarts.init($("#main")[0]);
+                data.sort(function (a, b) {
+                    if (a.SumBoxOffice > 150000) {
+                        return 10000000000000000000
+                    } else if (b.SumBoxOffice > 150000) {
+                        return -10000000000000000000
+                    }
+                    return a.time - b.time > 0 ? 1 : a.time - b.time == 0 ? a.SumBoxOffice - b.SumBoxOffice : -1
+                })
+                var option = {
+                    title: {
+                        text: "         中国动画电影票房"  //'ECharts 入门示例'
+                    },
+                    tooltip: {},
+                    dataset: {
+                        source: data
+                    },
+                    dataZoom: [
+                        {
+                            filterMode: "none",
+                            show: true,
+                            realtime: true,
+                            start: 0,
+                            end: 100
+                        },
+                        {
+                            type: 'inside',
+                            realtime: true,
+                            start: 0,
+                            end: 100
+                        }
+                    ],
+                    xAxis: {
+                        type: 'time',
+                        min: "2020-1-1",
+                        max: "2021-1-1",
+                    },
+                    yAxis: {
+                        //max: 200000,
+                        //min: 0.000000001
+                        //interval:100000,
+                    },
+                    series: [{
+                        name: '票房',
+                        label:{
+                            show:true,
+                            formatter: function (params) {
+                                var v = params.value; 
+                                return `${v["MovieName"]}`
+                            } 
+                        }, 
+                        itemStyle: {
+                            normal: {
+
+                                color: function (params) {
+                                    var v = params.value;
+                                    console.log(v.country)
+                                    return getColor(v.country)
+                                }
+                            }
+                        },
+                        type: 'scatter',
+                        encode: {
+                            // 将 "amount" 列映射到 X 轴。
+                            x: "ReleaseTime",
+                            // 将 "product" 列映射到 Y 轴。
+                            y: 'SumBoxOffice'
+                        },
+                        tooltip: {
+                            trigger: 'item',
+                            formatter: function (params) {
+                                var v = params.value; 
+                                return `${v["MovieName"]}<br>${v["ReleaseTime"]}<br>票房:${v["SumBoxOffice"]}<br>${v["countryt"]}`
+                            }
+                        }
+                    }]
+                }
+                //myChart.setOption(option);
+                 
+                var l = []
+                var c  =[]
+                setOption = function () {
+                    var d = data.shift()
+                    if (!d) {
+                        option.title.text = `              2020年中国动画电影票房`
+                    } else {
+                        setTimeout(setOption, 10);
+                        l.push(d)
+                        option.title.text = `              ${d.ReleaseTime}  ${d.MovieName}  ${d.countryt}  ${d.SumBoxOffice}万` 
+                        c.push( option.title.text)
+                    }
+                    // 指定图表的配置项和数据
+                    option.dataset.source = l
+                    // 使用刚指定的配置项和数据显示图表。
+                    myChart.setOption(option);
+                }
+                setTimeout(setOption, 0)
+                  console.log(c )
+            }, "text")
+        }
+        //run()
+
+        document.body.addEventListener("click", run)
+
+    </script>
+</body>
+
+</html>
+ 
