@@ -24,6 +24,7 @@
             "美国": "#1677b3",
         }
         colors = "#336633,#990033,#FFCC99,#33CC33,#6666CC,#CCCC33,#CCFFCC,#FFCC99,#CCFF99,#CCCCCC,#CCCC00,#999966,#FF6666,#FFFF00,#006699".split(",")
+        var c  =[]
 
         make = function (l) {
             var l2 = []
@@ -33,9 +34,8 @@
                 var d = l[i];
 
                 e = d && d.info && d.info.Table && d.info.Table[0]
-                console.log(e)
+                //console.log(e)
                 if (e) {
-
                     e.countrys = (e.MovieCountry || '').replace(/\/|\d+/g, "").split('|') 
                     e.countrys.pop()
                     e.country = e.countrys[0] || "中国"
@@ -73,7 +73,7 @@
             $.get("程序/详细数据 (2).json", function (data) {
 
                 var data = make(JSON.parse(data))
-                console.log(data)
+                //console.log(data)
                 // 基于准备好的dom，初始化echarts实例
                 var myChart = echarts.init($("#main")[0]);
                 data.sort(function (a, b) {
@@ -119,19 +119,18 @@
                     },
                     series: [{
                         name: '票房',
-                        label:{
+                        /*label:{
                             show:true,
                             formatter: function (params) {
                                 var v = params.value; 
                                 return `${v["MovieName"]}`
                             } 
-                        }, 
+                        }, */
                         itemStyle: {
                             normal: {
 
                                 color: function (params) {
-                                    var v = params.value;
-                                    console.log(v.country)
+                                    var v = params.value; 
                                     return getColor(v.country)
                                 }
                             }
@@ -155,7 +154,6 @@
                 //myChart.setOption(option);
                  
                 var l = []
-                var c  =[]
                 setOption = function () {
                     var d = data.shift()
                     if (!d) {
